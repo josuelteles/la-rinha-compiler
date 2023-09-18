@@ -1,10 +1,8 @@
 <div align="center">
 
-![la-rinha]
+<img src="img/la_rinha.png" class="img-responsive" alt=""> </div>
 
 </div>
-
-
 
 ## What is that?
 
