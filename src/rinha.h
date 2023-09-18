@@ -43,6 +43,7 @@ typedef enum {
     TOKEN_FIRST,
     TOKEN_SECOND,
     TOKEN_MOD,
+    TOKEN_YASWOC,
     TOKEN_LT,
     TOKEN_NUMBER,
     TOKEN_IDENTIFIER,
@@ -399,6 +400,7 @@ _RINHA_CALL_ static rinha_value_t rinha_value_set_(rinha_value_t value);
         printf("\n----------------------------------------------------\n");\
     }
 
+// Define a macro BREAK para pausar a execução para depuração
 #define BREAK getchar();
 
 #else

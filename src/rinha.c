@@ -22,6 +22,24 @@
 #include "rinha.h"
 
 
+/**
+ * @brief Just for fun
+ *
+ * This one you have to find out what it does
+ */
+static const char special_call[] = {0x63, 0x6F, 0x77, 0x73, 0x61, 0x79, 0x00};
+
+static const char woc[] = {
+    0x20, 0x20, 0x20, 0x5C, 0x20, 0x20, 0x20, 0x20, 0x5E, 0x5F, 0x5F, 0x5E,
+    0x0A, 0x20, 0x20, 0x20, 0x20, 0x5C, 0x20, 0x20, 0x20, 0x28, 0x6F, 0x6F,
+    0x29, 0x5C, 0x5F, 0x5F, 0x5F, 0x5F, 0x5F, 0x5F, 0x5F, 0x0A, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x28, 0x5F, 0x5F, 0x29, 0x5C, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x29, 0x5C, 0x2F, 0x5C, 0x0A, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7C,
+    0x7C, 0x2D, 0x2D, 0x2D, 0x2D, 0x77, 0x20, 0x7C, 0x0A, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x7C, 0x7C, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x7C, 0x7C, 0x0A,
+};
 
 static bool on_tests = false;
 
@@ -336,6 +354,8 @@ token_type rinha_discover_token_typeype_(char *token) {
   } else if (strcmp(token, "true") == 0) {
     tokens[rinha_tok_count].value = rinha_value_bool_set_(true);
     return TOKEN_TRUE;
+  } else if (strcmp(token, special_call) == 0) {
+    return TOKEN_YASWOC;
   } else if (strcmp(token, "false") == 0) {
     return TOKEN_FALSE;
   } else if (strcmp(token, "print") == 0) {
@@ -850,6 +870,9 @@ void rinha_parse_statement_(rinha_value_t *ret) {
   case TOKEN_SEMICOLON:
     rinha_token_advance();
     break;
+  case TOKEN_YASWOC:
+    rinha_yaswoc(ret);
+    break;
   case TOKEN_RPAREN:
     rinha_token_advance();
     break;
@@ -1351,6 +1374,44 @@ void rinha_parser_identifier(void) {
     rinha_error(rinha_current_token_ctx, "Expected an identifier ");
   }
 }
+
+//Surprise...
+void rinha_yaswoc(rinha_value_t *value) {
+
+  rinha_token_consume_(TOKEN_YASWOC);
+  rinha_token_consume_(TOKEN_LPAREN);
+
+  char *dialog = rinha_current_token_ctx.lexeme;
+  rinha_value_t v;
+  v.type = STRING;
+  int w = sizeof(woc) / sizeof(woc[0]);
+  int l = strlen(dialog);
+  int i = 1;
+
+  v.string[0] = 0x20;
+  for (; i < l; ++i)
+    v.string[i] = 0x5F;
+  v.string[i++] = 0x0A;
+  v.string[i++] = 0x3C;
+  v.string[i++] = 0x20;
+  for (int j = 0; j < l; ++j)
+    v.string[i++] = dialog[j];
+  v.string[i++] = 0x20;
+  v.string[i++] = 0x3E;
+  v.string[i++] = 0x0A;
+  v.string[i++] = 0x20;
+  for (int j = 0; j < l; ++j)
+    v.string[i++] = 0x2D;
+  v.string[i++] = 0x0A;
+  for (int j = 0; j < w; ++j)
+    v.string[i++] = woc[j];
+  v.string[i++] = 0x0A;
+  v.string[i++] = 0x00;
+
+  rinha_print_(&v, true, false);
+  rinha_token_advance();
+}
+
 
 /**
  * @brief Execute a Rinha script.
