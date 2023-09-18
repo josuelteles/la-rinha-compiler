@@ -27,36 +27,116 @@ static bool on_tests = false;
 
 static char source_name[128];
 
-
+/**
+ * @brief Source code pointer.
+ *
+ * This pointer is used to store the source code of the Rinha program.
+ */
 static char *source_code = NULL;
 
+/**
+ * @brief Temporary buffer.
+ *
+ * A temporary character buffer with a maximum size defined by RINHA_CONFIG_STRING_VALUE_MAX.
+ */
 static char tmp[RINHA_CONFIG_STRING_VALUE_MAX] = {0};
 
+/**
+ * @brief Global stack.
+ *
+ * The main stack used in the Rinha interpreter.
+ */
 static stack_t global;
 
+/**
+ * @brief Secondary stacks.
+ *
+ * An array of secondary stacks used in the Rinha interpreter.
+ */
 static stack_t st2[16544];
 
+/**
+ * @brief Stack pointer.
+ *
+ * Pointer to the current stack, initially pointing to st2.
+ */
 static stack_t *stacks = st2;
 
+/**
+ * @brief Stack context pointer.
+ *
+ * Pointer used to manage the stack context.
+ */
 static stack_t *stack_ctx;
 
+/**
+ * @brief Count of function calls.
+ *
+ * Keeps track of the number of function calls made during execution.
+ */
 static int calls_count = 0;
 
+/**
+ * @brief Rinha stack pointer.
+ *
+ * Pointer to the current position in the Rinha stack.
+ */
 static int rinha_sp = 0;
 
+/**
+ * @brief Token count.
+ *
+ * Keeps track of the number of tokens encountered in the Rinha program.
+ */
 static int rinha_tok_count = 0;
 
+/**
+ * @brief Program counter.
+ *
+ * Keeps track of the program counter for Rinha program execution.
+ */
 static int rinha_pc = 0;
 
+/**
+ * @brief Current token context.
+ *
+ * Stores the current token context during Rinha program parsing and execution.
+ */
 static token_t rinha_current_token_ctx;
 
+/**
+ * @brief Token array.
+ *
+ * An array of tokens used in the Rinha interpreter, with a maximum size of 1000.
+ */
 static token_t tokens[1000] = {0};
 
+/**
+ * @brief Function symbols array.
+ *
+ * An array that stores function symbols and their details, with a maximum size defined
+ * by RINHA_CONFIG_SYMBOLS_SIZE.
+ */
 static function_t calls[RINHA_CONFIG_SYMBOLS_SIZE];
 
+/**
+ * @brief Current function pointer.
+ *
+ * Pointer to the currently executing function context.
+ */
 static function_t *current_function = NULL;
 
 
+/**
+ * @brief Print a Rinha value with optional line feed and debugging information.
+ *
+ * This function prints a Rinha value to the standard output stream, with the option
+ * to add a line feed character and display debugging information.
+ *
+ * @param[in] value   The Rinha value to print.
+ * @param[in] lf      Set to true to add a line feed character at the end, false otherwise.
+ * @param[in] debug   Set to true to enable debugging information, false to skip it.
+ */
 void rinha_print_(rinha_value_t *value, bool lf, bool debug) {
 
     if(on_tests)
@@ -147,6 +227,15 @@ rinha_value_tuple_set_(rinha_value_t *first, rinha_value_t *second) {
   return ret;
 }
 
+/**
+ * @brief Create a Rinha value with the same type as the input value.
+ *
+ * This function creates a new Rinha value with the same type as the input value
+ * and copies the value accordingly.
+ *
+ * @param[in] value  The input Rinha value.
+ * @return A new Rinha value with the same type and value as the input.
+ */
 _RINHA_CALL_ static rinha_value_t rinha_value_set_(rinha_value_t value) {
   switch (value.type) {
     case STRING:
@@ -158,6 +247,14 @@ _RINHA_CALL_ static rinha_value_t rinha_value_set_(rinha_value_t value) {
   }
 }
 
+/**
+ * @brief Calculate the hash value of a string using the djb2 algorithm.
+ *
+ * This function calculates the hash value of a string using the djb2 hashing algorithm.
+ *
+ * @param[in] str  The input string to hash.
+ * @return The calculated hash value.
+ */
 inline static unsigned long rinha_hash_str_(char *str) {
   unsigned long hash = 5381;
   int c;
@@ -170,6 +267,14 @@ inline static unsigned long rinha_hash_str_(char *str) {
   return (hash % RINHA_CONFIG_SYMBOLS_SIZE);
 }
 
+/**
+ * @brief Calculate a hash value for a function's stack context.
+ *
+ * This function calculates a hash value for a function's stack context based on its contents.
+ *
+ * @param[in] f  The function whose stack context is being hashed.
+ * @return The calculated hash value for the stack context.
+ */
 unsigned int rinha_hash_stack_(function_t *f) {
   unsigned int hash = 0;
 
@@ -279,6 +384,16 @@ token_type rinha_discover_token_typeype_(char *token) {
   return TOKEN_IDENTIFIER;
 }
 
+/**
+ * @brief Set a variable in the current stack context.
+ *
+ * This function sets a variable in the specified stack context with the given value.
+ * It also determines the variable type based on the value if it is not explicitly defined.
+ *
+ * @param[in] ctx    The stack context in which to set the variable.
+ * @param[in] value  The value to set.
+ * @param[in] hash   The hash value of the variable name.
+ */
 _RINHA_CALL_ void rinha_var_set_(stack_t *ctx, rinha_value_t *value, int hash) {
   // Determine the variable type if not explicitly defined
   value->type = (!value->type) ? (isdigit(value->string[0])) ? INTEGER : STRING : value->type;
@@ -288,6 +403,16 @@ _RINHA_CALL_ void rinha_var_set_(stack_t *ctx, rinha_value_t *value, int hash) {
   ctx->count++;
 }
 
+/**
+ * @brief Get a variable from the current stack context.
+ *
+ * This function retrieves a variable from the specified stack context based on its hash value.
+ * If the variable is undefined in the current context, it looks in the global context.
+ *
+ * @param[in] ctx   The stack context from which to retrieve the variable.
+ * @param[in] hash  The hash value of the variable name.
+ * @return A pointer to the retrieved variable.
+ */
 _RINHA_CALL_ rinha_value_t *rinha_var_get_(stack_t *ctx, int hash) {
   rinha_value_t *v = &ctx->mem[hash].value;
   v->hash = hash;
@@ -300,6 +425,16 @@ _RINHA_CALL_ rinha_value_t *rinha_var_get_(stack_t *ctx, int hash) {
   return v;
 }
 
+/**
+ * @brief Set function details in the global functions array.
+ *
+ * This function sets details for a function in the global functions array, such as the program
+ * counter (PC). It increments the calls_count to keep track of the number of function calls.
+ *
+ * @param[in] pc    The program counter value for the function.
+ * @param[in] hash  The hash value of the function name.
+ * @return A pointer to the function details.
+ */
 _RINHA_CALL_ function_t *rinha_function_set_(int pc, int hash) {
   function_t *call = &calls[hash];
   call->pc = pc;
@@ -307,15 +442,42 @@ _RINHA_CALL_ function_t *rinha_function_set_(int pc, int hash) {
   return call;
 }
 
+/**
+ * @brief Get function details from the global functions array.
+ *
+ * This function retrieves function details from the global functions array based on the hash value
+ * of the function name. If the function is not found, it returns NULL.
+ *
+ * @param[in] hash  The hash value of the function name.
+ * @return A pointer to the function details, or NULL if not found.
+ */
 _RINHA_CALL_ function_t *rinha_function_get_(int hash) {
   function_t *f = &calls[hash];
   return (f && f->pc) ? f : NULL;
 }
 
+/**
+ * @brief Add a parameter hash to a function's argument list.
+ *
+ * This function adds a parameter hash to a function's argument list.
+ *
+ * @param[in,out] f     The function to which the parameter is added.
+ * @param[in]     hash  The hash value of the parameter name.
+ */
 _RINHA_CALL_ void rinha_call_parameter_add(function_t *f, int hash) {
   f->args.hash[f->args.count++] = hash;
 }
 
+/**
+ * @brief Initialize a function parameter in the function's stack context.
+ *
+ * This function initializes a function parameter in the stack context of the given function.
+ * It copies the provided value to the specified parameter index in the stack context.
+ *
+ * @param[in] f       The function whose stack context is used.
+ * @param[in] value   The value to set as the parameter's initial value.
+ * @param[in] index   The index of the parameter in the argument list.
+ */
 _RINHA_CALL_ static void rinha_function_param_init_(function_t *f, rinha_value_t *value, int index) {
   // Set the parameter value in the function's stack context
   f->stack->mem[f->args.hash[index]].value = *value;
@@ -324,10 +486,29 @@ _RINHA_CALL_ static void rinha_function_param_init_(function_t *f, rinha_value_t
   f->stack->count++;
 }
 
+/**
+ * @brief Check if a character is a delimiter.
+ *
+ * This function checks if a given character is a delimiter, which is a character that
+ * separates tokens in the Rinha language.
+ *
+ * @param[in] c   The character to check.
+ * @return true if the character is a delimiter, false otherwise.
+ */
 inline bool rinha_isdelim(char c) {
   return (strchr("()\"'{},+-*/%;", c) != NULL);
 }
 
+/**
+ * @brief Print an error message with context information.
+ *
+ * This function prints an error message along with context information, such as the error location,
+ * the token causing the error, and the relevant source code snippet.
+ *
+ * @param[in] token  The token associated with the error.
+ * @param[in] fmt    The error message format string (supports variable arguments).
+ * @param[in] ...    Variable arguments to be formatted according to fmt.
+ */
 void rinha_error(const token_t token, const char *fmt, ...) {
 
   FILE *RINHA_OUTERR = stderr;
@@ -383,6 +564,15 @@ void rinha_error(const token_t token, const char *fmt, ...) {
   exit(EXIT_FAILURE);
 }
 
+/**
+ * @brief Tokenize a Rinha source code into tokens.
+ *
+ * This function takes a Rinha source code string and tokenizes it into individual tokens.
+ *
+ * @param[in,out] code_ptr       A pointer to the source code string (updated as tokens are processed).
+ * @param[out]    tokens         An array to store the generated tokens.
+ * @param[in,out] rinha_tok_count A pointer to an integer to store the total token count (updated).
+ */
 void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count) {
   int line_number = 1;
   int token_position = 0;
@@ -464,19 +654,38 @@ int rinha_check_valid_identifier(const char *token) {
   return 1;
 }
 
+/**
+ * @brief Advance the current token to the next token in the token stream.
+ */
 void rinha_token_advance() {
   rinha_current_token_ctx = tokens[++rinha_pc];
   // DEBUG BREAK;
 }
 
+/**
+ * @brief Move the current token back to the previous token in the token stream.
+ */
 void rinha_token_previous() {
   rinha_current_token_ctx = tokens[--rinha_pc];
 }
 
+/**
+ * @brief Get a pointer to the next token in the token stream.
+ *
+ * @return A pointer to the next token.
+ */
 token_t *rinha_next_token(void) {
   return &tokens[rinha_pc];
 }
 
+/**
+ * @brief Consume the current token if its type matches the expected type.
+ *
+ * If the current token's type matches the expected type, it is consumed (advanced);
+ * otherwise, an error message is generated.
+ *
+ * @param[in] expected_type  The expected token type.
+ */
 void rinha_token_consume_(token_type expected_type) {
   if (rinha_current_token_ctx.type == expected_type) {
     rinha_token_advance();
@@ -486,12 +695,28 @@ void rinha_token_consume_(token_type expected_type) {
   }
 }
 
+/**
+ * @brief Parse a Rinha program.
+ *
+ * This function parses a Rinha program by repeatedly calling the statement parsing function
+ * until the end of the token stream (EOF) is reached.
+ *
+ * @param[in,out] ret  A pointer to the result value of the program (updated during parsing).
+ */
 void rinha_parse_program_(rinha_value_t *ret) {
   while (rinha_current_token_ctx.type != TOKEN_EOF) {
     rinha_parse_statement_(ret);
   }
 }
 
+/**
+ * @brief Parse the "first" function to extract the first element of a tuple.
+ *
+ * This function parses the "first" function, expecting it to be called with a tuple
+ * as an argument. It extracts and returns the first element of the tuple.
+ *
+ * @param[in,out] ret  A pointer to the result value (the first element of the tuple).
+ */
 void rinha_parse_first(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_FIRST);
   rinha_token_consume_(TOKEN_LPAREN);
@@ -507,6 +732,14 @@ void rinha_parse_first(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_RPAREN);
 }
 
+/**
+ * @brief Parse the "second" function to extract the second element of a tuple.
+ *
+ * This function parses the "second" function, expecting it to be called with a tuple
+ * as an argument. It extracts and returns the second element of the tuple.
+ *
+ * @param[in,out] ret  A pointer to the result value (the second element of the tuple).
+ */
 void rinha_parse_second(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_SECOND);
   rinha_token_consume_(TOKEN_LPAREN);
@@ -522,6 +755,14 @@ void rinha_parse_second(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_RPAREN);
 }
 
+/**
+ * @brief Parse a function closure.
+ *
+ * This function parses a function closure, which is defined using the "fn" keyword.
+ * It extracts the parameters and body of the closure and stores them in a function structure.
+ *
+ * @param[in] hash  The hash value for the closure's identifier.
+ */
 void rinha_parse_closure(int hash) {
 
   function_t *call = rinha_function_set_(rinha_pc, hash);
@@ -556,6 +797,14 @@ void rinha_parse_closure(int hash) {
   rinha_token_consume_(TOKEN_RBRACE);
 }
 
+/**
+ * @brief Parse a Rinha statement and update the result value.
+ *
+ * This function parses a Rinha statement based on the current token and updates
+ * the result value pointed to by 'ret' accordingly.
+ *
+ * @param[in,out] ret  A pointer to the result value (updated during parsing).
+ */
 void rinha_parse_statement_(rinha_value_t *ret) {
   // DEBUG
   switch (rinha_current_token_ctx.type) {
@@ -655,6 +904,14 @@ bool rinha_parse_comparison_(rinha_value_t *left) {
   return (left->number != 0);
 }
 
+/**
+ * @brief Parse a logical AND expression.
+ *
+ * This function parses a logical AND expression and returns the result.
+ *
+ * @param[in,out] left  A pointer to the left operand (updated during parsing).
+ * @return The result of the logical AND expression.
+ */
 bool rinha_parse_logical_and_(rinha_value_t *left) {
   bool ret = rinha_parse_comparison_(left);
 
@@ -668,6 +925,14 @@ bool rinha_parse_logical_and_(rinha_value_t *left) {
   return ret;
 }
 
+/**
+ * @brief Parse a logical OR expression.
+ *
+ * This function parses a logical OR expression and returns the result.
+ *
+ * @param[in,out] left  A pointer to the left operand (updated during parsing).
+ * @return The result of the logical OR expression.
+ */
 bool rinha_parser_logical_or_(rinha_value_t *left) {
   bool l = rinha_parse_logical_and_(left); // Parse the left operand and initialize the result
 
@@ -681,6 +946,14 @@ bool rinha_parser_logical_or_(rinha_value_t *left) {
   return l;
 }
 
+/**
+ * @brief Parse an assignment expression.
+ *
+ * This function parses an assignment expression and returns the result.
+ *
+ * @param[in,out] left  A pointer to the left operand (updated during parsing).
+ * @return The result of the assignment expression.
+ */
 bool rinha_parser_assign(rinha_value_t *left) {
   int hash = rinha_current_token_ctx.hash;
   bool l = rinha_parser_logical_or_(left);
@@ -698,6 +971,14 @@ bool rinha_parser_assign(rinha_value_t *left) {
 
 // Atomic
 
+/**
+ * @brief Parse a primary expression and update the result value.
+ *
+ * This function parses a primary expression, which can be an identifier, a function call,
+ * a number, or a string. It updates the result value pointed to by 'ret' accordingly.
+ *
+ * @param[in,out] ret  A pointer to the result value (updated during parsing).
+ */
 void rinha_parse_primary_(rinha_value_t *ret) {
   switch (rinha_current_token_ctx.type) {
   case TOKEN_IDENTIFIER:
@@ -807,6 +1088,15 @@ _RINHA_CALL_ static void rinha_parse_term_(rinha_value_t *left) {
   }
 }
 
+/**
+ * @brief Concatenate two Rinha values and store the result in the left value.
+ *
+ * This function concatenates two Rinha values (left and right) and stores the result in
+ * the left value. The concatenation is performed based on the types of the values.
+ *
+ * @param[in,out] left   A pointer to the left operand and the destination for the result.
+ * @param[in]     right  A pointer to the right operand.
+ */
 _RINHA_CALL_ static void rinha_value_concat_(rinha_value_t *left, rinha_value_t *right) {
 
     // Check the types of the left and right values for concatenation
@@ -857,6 +1147,18 @@ void rinha_parse_calc_(rinha_value_t *left) {
 }
 
 
+/**
+ * @brief Get a cached value from the memoization cache.
+ *
+ * This function retrieves a cached value from the memoization cache associated with a function call.
+ * It checks if the cache is enabled and if the value is cached for the given hash.
+ *
+ * @param[in]  call  A pointer to the function call structure.
+ * @param[out] ret   A pointer to store the cached value (if found).
+ * @param[in]  hash  The hash value used as the cache key.
+ *
+ * @return 'true' if the value is cached and retrieved, 'false' otherwise.
+ */
 bool rinha_call_memo_cache_get_(function_t *call, rinha_value_t *ret, int hash) {
 #if RINHA_CONFIG_CACHE_ENABLE == true
   cache_t *cache = &call->cache[hash];
@@ -872,6 +1174,16 @@ bool rinha_call_memo_cache_get_(function_t *call, rinha_value_t *ret, int hash) 
 #endif
 }
 
+/**
+ * @brief Set a value in the memoization cache.
+ *
+ * This function stores a value in the memoization cache associated with a function call.
+ * It checks if the cache is enabled and whether a collision occurred before caching.
+ *
+ * @param[in,out] call  A pointer to the function call structure.
+ * @param[in]     ret   A pointer to the value to be cached.
+ * @param[in]     hash  The hash value used as the cache key.
+ */
 void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *ret, int hash) {
 #if RINHA_CONFIG_CACHE_ENABLE == true
   cache_t *cache = &call->cache[hash];
@@ -885,10 +1197,30 @@ void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *ret, int hash) 
 #endif
 }
 
+
+
+/**
+ * @brief Parse an expression and update the result value.
+ *
+ * This function parses an expression and updates the result value pointed to by 'ret'.
+ * The specific expression parsing logic is delegated to 'rinha_parser_assign'.
+ *
+ * @param[in,out] ret  A pointer to the result value (updated during parsing).
+ */
 void rinha_parser_expression_(rinha_value_t *ret) {
   rinha_parser_assign(ret);
 }
 
+
+/**
+ * @brief Execute a Rinha function call.
+ *
+ * This function executes a Rinha function call, including parsing its arguments, checking memoization
+ * cache, and executing the function's code block.
+ *
+ * @param[in]  call  A pointer to the function call structure.
+ * @param[out] ret   A pointer to store the return value (updated during execution).
+ */
 void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
   stack_ctx = &stacks[rinha_sp];
 
@@ -1020,6 +1352,18 @@ void rinha_parser_identifier(void) {
   }
 }
 
+/**
+ * @brief Execute a Rinha script.
+ *
+ * This function executes a Rinha script, parsing and interpreting the provided script code.
+ *
+ * @param name Script name.
+ * @param script The Rinha script code to execute.
+ * @param[out] response The result of script execution.
+ * @param test Set to true if running in test mode, false otherwise.
+ *
+ * @return `true` if the script executed successfully, `false` on failure.
+ */
 bool rinha_script_exec(char *name, char *script, rinha_value_t *response, bool test) {
 
     memset(tokens, 0, sizeof(tokens));
