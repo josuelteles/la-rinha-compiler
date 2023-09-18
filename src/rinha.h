@@ -220,7 +220,7 @@ _RINHA_CALL_ static rinha_value_t rinha_value_set_(rinha_value_t value);
         printf("\n----------------------------------------------------\n");\
     }
 
-// Define a macro BREAK para pausar a execução para depuração
+//Debug pause
 #define BREAK getchar();
 
 #else
