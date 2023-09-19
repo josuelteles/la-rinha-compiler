@@ -26,34 +26,29 @@ char *rinha_load_file(const char *file) {
   struct stat s;
 
   if (stat(file, &s) == -1) {
-    fprintf(stderr,
-            "There was an error getting config file info (file:%s, err: %s)",
-            file, strerror(errno));
-
+    fprintf(stderr, "Error getting file info (file:%s, err: %s)",
+      file, strerror(errno));
     return NULL;
   }
 
   FILE *fp = fopen(file, "r");
   if (!fp) {
-    fprintf(stderr, "Error open config file (file:%s, err: %s)", file,
-            strerror(errno));
-
+    fprintf(stderr, "Error opening file (file:%s, err: %s)", file,
+     strerror(errno));
     return NULL;
   }
 
   char *buffer = calloc(s.st_size + 1, sizeof(char));
   if (!buffer) {
-    fprintf(stderr, "not enough memory (file:%s)", file);
-
+    fprintf(stderr, "Memory allocation failed (file:%s)", file);
     fclose(fp);
     return NULL;
   }
 
   size_t r = fread(buffer, sizeof(char), s.st_size, fp);
   if (r != (size_t)s.st_size) {
-    fprintf(stderr, "Error read config file (file:%s, err: %s)", file,
-            strerror(errno));
-
+    fprintf(stderr, "Error reading file (file:%s, err: %s)", file,
+       strerror(errno));
     free(buffer);
     fclose(fp);
     return NULL;
@@ -65,20 +60,21 @@ char *rinha_load_file(const char *file) {
   return buffer;
 }
 
-bool rinha_stack_config(void)
-{
-  //TODO: Config
+bool rinha_stack_config(void) {
   struct rlimit rl;
-  rl.rlim_cur = 1024 * 1024 * 500; // 500 MB
-  rl.rlim_max = 1024 * 1024 * 500; // 500 MB
+
+  rl.rlim_cur = 1024 * 1024 * RINHA_CONFIG_RLIMIT_STACK;
+  rl.rlim_max = 1024 * 1024 * RINHA_CONFIG_RLIMIT_STACK;
 
   if (setrlimit(RLIMIT_STACK, &rl) == -1) {
-    fprintf(stderr,
-            "Error stack resize config (err: %s)",
-             strerror(errno));
-     return false;
+      fprintf(stderr, "Error configuring stack size limit (err: %s)",
+              strerror(errno));
+      return false;
   }
+
+  return true;
 }
+
 
 void rinha_banner(void) {
 
@@ -93,7 +89,7 @@ void rinha_banner(void) {
       "░ ░ ▒  ░ ▒   ▒▒ ░     ░▒ ░ ▒░ ▒ ░░ ░░   ░ ▒░ ▒ ░▒░ ░  ▒   ▒▒ ░  \n"
       " ░ ░    ░   ▒        ░░   ░  ▒ ░   ░   ░ ░  ░  ░░ ░  ░   ▒      \n"
       "   ░  ░     ░  ░      ░      ░           ░  ░  ░  ░      ░  ░   \n"
-      "\n\033[0;37m Alpha version 0.000001\033[0m\n";
+      "\n\033[0;37mVersion " RINHA_VERSION "\033[0m\n";
 
   fprintf( stdout, "\n%s\n\n", banner);
 
@@ -110,7 +106,7 @@ int usage(const char *prog) {
 int main(int argc, char *argv[]) {
 
   //TODO: Set options config here
-  //rinha_stack_config();
+  rinha_stack_config();
   //rinha_banner();
 
   if (argc < 2) {

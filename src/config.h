@@ -27,19 +27,19 @@
  * @details
  * - RINHA_CONFIG_SYMBOLS_SIZE: Size of the symbols table.
  */
-#define RINHA_CONFIG_SYMBOLS_SIZE 32
+#define RINHA_CONFIG_SYMBOLS_SIZE 31
 
 /**
  * @details
  * - RINHA_CONFIG_STACK_SIZE: Size of the execution stack.
  */
-#define RINHA_CONFIG_STACK_SIZE 16546
+#define RINHA_CONFIG_STACK_SIZE 65536
 
 /**
  * @details
  * - RINHA_CONFIG_CALLS_SIZE: Maximum number of function calls.
  */
-#define RINHA_CONFIG_CALLS_SIZE 128
+#define RINHA_CONFIG_CALLS_SIZE 64
 
 /**
  * @details
@@ -51,6 +51,25 @@
  * @details
  * - RINHA_CONFIG_CACHE_SIZE: Size of the cache when enabled.
  */
-#define RINHA_CONFIG_CACHE_SIZE 128
+#define RINHA_CONFIG_CACHE_SIZE 4096
+
+/**
+ * @details
+ * - RINHA_CONFIG_TOKENS_SIZE: Maximum number of tokens that can be stored in the token array
+ */
+#define RINHA_CONFIG_TOKENS_SIZE 1000
+
+/**
+ * @details
+ * - RINHA_CONFIG_SYMBOL_NAME_SIZE: Maximum size of symbol (identifier) names in characters.
+ */
+#define RINHA_CONFIG_SYMBOL_NAME_SIZE 16
+
+/**
+ * @brief Maximum stack size limit (RLIMIT_STACK) for the Rinha program.
+ *
+ * @note Adjust this value as needed based on the memory requirements of your environment.
+ */
+#define RINHA_CONFIG_RLIMIT_STACK 512 //Mb
 
 #endif

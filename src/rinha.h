@@ -96,7 +96,7 @@ typedef enum {
         int64_t number; \
         bool boolean; \
         char string[RINHA_CONFIG_STRING_VALUE_MAX]; \
-   };
+   }
 
 struct __primitive {
  RINHA_PRIMITIVES;
@@ -128,7 +128,7 @@ typedef struct _value {
  * @var value The value associated with the variable.
  */
 typedef struct {
-    char name[32];
+    char name[RINHA_CONFIG_SYMBOL_NAME_SIZE];
     rinha_value_t value;
 } variable_t;
 
@@ -162,8 +162,8 @@ typedef struct {
  * @var count The number of variables in the stack.
  */
 typedef struct {
-    //variable_t mem[RINHA_CONFIG_SYMBOLS_SIZE];
-    variable_t mem[64];
+    variable_t mem[RINHA_CONFIG_SYMBOLS_SIZE];
+    //variable_t mem[64];
     int count;
 } stack_t;
 
@@ -175,9 +175,9 @@ typedef struct {
  * @var count The number of arguments.
  */
 typedef struct {
-    char name[16][16];
+    //char name[16][16];
     //int hash[RINHA_CONFIG_SYMBOLS_SIZE];
-    int hash[64];
+    int hash[16];
     int count;
 } args_t;
 
@@ -205,12 +205,13 @@ typedef struct {
  * @var pc Program counter associated with the function.
  */
 typedef struct {
-    char name[16];
+    char name[RINHA_CONFIG_SYMBOL_NAME_SIZE];
     rinha_value_t ret;
     args_t args;
     stack_t *stack;
     //cache_t cache[RINHA_CONFIG_SYMBOLS_SIZE];
     cache_t cache[RINHA_CONFIG_CACHE_SIZE];
+    int cache_size;
     int pc;
 } function_t;
 
@@ -237,7 +238,7 @@ void rinha_token_consume_(token_type expected_type);
  *
  * @param[out] result The rinha_value_t structure to store the parsed program.
  */
-void rinha_parse_program_(rinha_value_t *result);
+void rinha_exec_program_(rinha_value_t *result);
 
 /**
  * @brief Parse a statement.
@@ -246,7 +247,7 @@ void rinha_parse_program_(rinha_value_t *result);
  *
  * @param[out] result The rinha_value_t structure to store the parsed statement.
  */
-void rinha_parse_statement_(rinha_value_t *result);
+void rinha_exec_statement_(rinha_value_t *result);
 
 /**
  * @brief Parse an expression.
@@ -255,7 +256,7 @@ void rinha_parse_statement_(rinha_value_t *result);
  *
  * @param[out] result The rinha_value_t structure to store the parsed expression.
  */
-void rinha_parser_expression_(rinha_value_t *result);
+rinha_value_t rinha_exec_expression_(rinha_value_t *result);
 
 /**
  * @brief Parse a block of code.
@@ -264,7 +265,7 @@ void rinha_parser_expression_(rinha_value_t *result);
  *
  * @param[out] result The rinha_value_t structure to store the parsed block.
  */
-void rinha_parse_block_(rinha_value_t *result);
+void rinha_exec_block_(rinha_value_t *result);
 
 /**
  * @brief Parse an if statement.
@@ -273,12 +274,12 @@ void rinha_parse_block_(rinha_value_t *result);
  *
  * @param[out] result The rinha_value_t structure to store the parsed if statement.
  */
-void rinha_parse_if_statement_(rinha_value_t *result);
+void rinha_exec_if_statement_(rinha_value_t *result);
 
 /**
  * @brief Parse an identifier.
  */
-void rinha_parser_identifier(void);
+void rinha_exec_identifier(void);
 
 /**
  * @brief Parse a logical OR expression.
@@ -289,7 +290,7 @@ void rinha_parser_identifier(void);
  *
  * @return `true` if the parsing is successful, `false` otherwise.
  */
-bool rinha_parser_logical_or_(rinha_value_t *result);
+rinha_value_t rinha_exec_logical_or_(rinha_value_t *result);
 
 /**
  * @brief Parse a term.
@@ -298,7 +299,7 @@ bool rinha_parser_logical_or_(rinha_value_t *result);
  *
  * @param[out] result The rinha_value_t structure to store the parsed term.
  */
-static void rinha_parse_term_(rinha_value_t *result);
+void rinha_exec_term_(rinha_value_t *result);
 
 /**
  * @brief Parse and calculate an expression.
@@ -307,7 +308,7 @@ static void rinha_parse_term_(rinha_value_t *result);
  *
  * @param[out] result The rinha_value_t structure to store the parsed and calculated expression.
  */
-void rinha_parse_calc_(rinha_value_t *result);
+void rinha_exec_calc_(rinha_value_t *result);
 
 /**
  * @brief Execute a function.
@@ -370,10 +371,12 @@ void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count);
 bool rinha_script_exec(char *name, char *script, rinha_value_t *response,
                              bool test);
 
+void rinha_clear_stack(void);
 
-_RINHA_CALL_ static rinha_value_t rinha_value_set_(rinha_value_t value);
+_RINHA_CALL_ rinha_value_t rinha_value_set_(rinha_value_t value);
 
 #define BOOL_NAME(b) ((b) ? "true" : "false")
+#define RINHA_UNUSED_PARAM(x) ((void)(x))
 
 #define COLOR_RED     "\x1b[1;91m"
 #define COLOR_WHITE   "\x1b[1m"
@@ -400,7 +403,6 @@ _RINHA_CALL_ static rinha_value_t rinha_value_set_(rinha_value_t value);
         printf("\n----------------------------------------------------\n");\
     }
 
-// Define a macro BREAK para pausar a execução para depuração
 #define BREAK getchar();
 
 #else

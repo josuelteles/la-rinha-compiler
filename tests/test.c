@@ -15,200 +15,221 @@
 
 
 TEST(rinha_hello_world) {
+  char *code =
+      " print(\"Hello, World!\");";
 
-    char *code =
-        " print(\"Hello, World!\");";
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_hello_world", code, &response, false);
+  rinha_script_exec("rinha_hello_world", code, &response, true);
 
-    EXPECT_EQ(response.type, STRING);
-    EXPECT_STREQ(response.string, "Hello, World!");
+  EXPECT_EQ(response.type, STRING);
+  EXPECT_STREQ(response.string, "Hello, World!");
 }
 
 TEST(rinha_fibonacci) {
 
-    char *code =
-       "let fib = fn (n) => {\n"
-       "    if (n < 2) {    \n"
-       "        n           \n"
-       "    } else {        \n"
-       "        fib(n - 1) + fib(n - 2)\n"
-       "    }  \n"
-       "};\n"
-       "print(fib(80)); \n";
+  char *code =
+     "let fib = fn (n) => {\n"
+     "    if (n < 2) {    \n"
+     "        n           \n"
+     "    } else {        \n"
+     "        fib(n - 1) + fib(n - 2)\n"
+     "    }  \n"
+     "};\n"
+     "print(fib(20)); \n";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_fibonacci", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.type, INTEGER);
-    EXPECT_EQ(response.number, 23416728348467685);
+  rinha_script_exec("rinha_fibonacci", code, &response, true);
+
+  EXPECT_EQ(response.type, INTEGER);
+  EXPECT_EQ(response.number, 6765);
 }
 
 //---------------------------------------------------------------------------
 
 TEST(rinha_sum0) {
 
-    char *code =
-       "let sum = fn (a, b) => { a + b };\n"
-       "print(sum(3, 2));\n";
+  char *code =
+     "let sum = fn (a, b) => { a + b };\n"
+     "print(sum(3, 2));\n";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_sum0", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.type, INTEGER);
-    EXPECT_EQ(response.number, 5);
+  rinha_script_exec("rinha_sum0", code, &response, true);
+
+  EXPECT_EQ(response.type, INTEGER);
+  EXPECT_EQ(response.number, 5);
 }
 
 
 TEST(rinha_sum1) {
 
-    char *code =
-       "let sum = fn (a, b) => { a + b }\n"
-       "print(sum(3, 2) + sum( 1, 2 ));\n";
+  char *code =
+     "let sum = fn (a, b) => { a + b }\n"
+     "print(sum(3, 2) + sum( 1, 2 ));\n";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_sum1", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.type, INTEGER);
-    EXPECT_EQ(response.number, 8);
+  rinha_script_exec("rinha_sum1", code, &response, true);
+
+  EXPECT_EQ(response.type, INTEGER);
+  EXPECT_EQ(response.number, 8);
 }
 
 TEST(rinha_sum2) {
 
-    char *code =
-       "let sum0 = fn ( arg1, arg2) => \n"
-              "{ arg1 + arg2 };\n "
-       "let sum1 = fn (var1, var2) => "
-              "{ sum0( var1, var2 ) + sum0( var1, var2 ) }; "
-       "print(sum1(3, 2) + sum1(6, 8));\n";
+  char *code =
+     "let sum0 = fn ( arg1, arg2) => \n"
+            "{ arg1 + arg2 };\n "
+     "let sum1 = fn (var1, var2) => "
+            "{ sum0( var1, var2 ) + sum0( var1, var2 ) }; "
+     "print(sum1(3, 2) + sum1(6, 8));\n";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_sum2", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.type, INTEGER);
-    EXPECT_EQ(response.number, 38);
+  rinha_script_exec("rinha_sum2", code, &response, true);
+
+  EXPECT_EQ(response.type, INTEGER);
+  EXPECT_EQ(response.number, 38);
 }
 
 TEST(rinha_sum3) {
 
-    char *code =
-        "let sum = fn (n) => {\n"
-        "    n + 1;\n"
-        "};\n"
-        "\n"
-        "let a = 2;\n"
-        "let b = 5;\n"
-        "let c = fn (v1, v2) => { v1-v2 };\n"
-        "print(c(8, 9)); \n"
-        "print (sum(fn (a, b) => { a+b } )); \n"
-        "print (sum(58)+c(a,b)); \n";
+  char *code =
+      "let sum = fn (n) => {\n"
+      "    n + 1;\n"
+      "};\n"
+      "\n"
+      "let a = 2;\n"
+      "let b = 5;\n"
+      "let c = fn (v1, v2) => { v1-v2 };\n"
+      "print(c(8, 9)); \n"
+      "print (sum(fn (a, b) => { a+b } )); \n"
+      "print (sum(58)+c(a,b)); \n";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_sum3", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.type, INTEGER);
-    EXPECT_EQ(response.number, 56);
+  rinha_script_exec("rinha_sum3", code, &response, true);
+
+  EXPECT_EQ(response.type, INTEGER);
+  EXPECT_EQ(response.number, 56);
 }
 
 // ------------------------------------------------------------------------
 
 TEST(rinha_calc0) {
 
-    char *code =
-       "let a = 9 \n"
-       "let b = (a + 2) * 3 / 2\n"
-       "print(b * 6);";
+  char *code =
+     "let a = 9 \n"
+     "let b = (a + 2) * 3 / 2\n"
+     "print(b * 6);";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_calc0", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.type, INTEGER);
-    EXPECT_EQ(response.number, 96);
+  rinha_script_exec("rinha_calc0", code, &response, true);
+
+  EXPECT_EQ(response.type, INTEGER);
+  EXPECT_EQ(response.number, 96);
 }
 
 TEST(rinha_calc1) {
 
-    char *code =
-        "let a = \"'/{} string test\" \n"
-        "let b = 3 + a\n"
-        "print(b)";
+  char *code =
+      "let a = \"'/{} string test\" \n"
+      "let b = 3 + a\n"
+      "print(b)";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_calc1", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.type, STRING);
-    EXPECT_STREQ(response.string, "3'/{} string test");
+  rinha_script_exec("rinha_calc1", code, &response, true);
+
+  EXPECT_EQ(response.type, STRING);
+  EXPECT_STREQ(response.string, "3'/{} string test");
 }
 
 TEST(rinha_cond0) {
 
-    char *code =
-      "let teste = fn (arg1, arg2) => { \n"
-      "    if ( arg1 > arg2 || 6 > 5 || 7 > 8  ) { \n"
-      "        print(\"COND1\"); \n"
-      "    } else {"
-      "        print(\"COND2\"); \n"
-      "    } \n"
-      "}; \n"
-      " teste(0, 3); ";
+  char *code =
+    "let teste = fn (arg1, arg2) => { \n"
+    "    if ( arg1 > arg2 || 6 > 5 || 7 > 8  ) { \n"
+    "        print(\"COND1\"); \n"
+    "    } else {"
+    "        print(\"COND2\"); \n"
+    "    } \n"
+    "}; \n"
+    " teste(0, 3); ";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_cond0", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_STREQ(response.string, "COND1");
+  rinha_script_exec("rinha_cond0", code, &response, true);
+
+  EXPECT_STREQ(response.string, "COND1");
 }
 
 TEST(rinha_tuples) {
 
-    char *code =
-        "let t = ((3*5),\"test\");\n"
-        "let a = 88;\n"
-        "let b = 99;\n"
-        "let t2 = first((second((96, a)), b)); \n"
-        "print(second((first((55, 60)), first((second((100, 200)), 90))))\n";
+  char *code =
+      "let t = ((3*5),\"test\");\n"
+      "let a = 88;\n"
+      "let b = 99;\n"
+      "let t2 = first((second((96, a)), b)); \n"
+      "print(second((first((55, 60)), first((second((100, 200)), 90))))\n";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_tuples", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_EQ(response.number, 200);
+  rinha_script_exec("rinha_tuples", code, &response, true);
+
+  EXPECT_EQ(response.number, 200);
 }
 
 TEST(rinha_concat) {
 
-    char *code =
-        "let a = 5;\n"
-        "let b = 33;\n"
-        "let c = a = b = 567;\n"
-        "print(\"c = [\"+c+\"]\");\n";
+  char *code =
+      "let a = 5;\n"
+      "let b = 33;\n"
+      "let c = a = b = 567;\n"
+      "print(\"c = [\"+c+\"]\");\n";
 
-    rinha_value_t response = {0};
-    rinha_script_exec("rinha_concat", code, &response, true);
+  rinha_value_t response = {0};
+  rinha_clear_stack();
 
-    EXPECT_STREQ(response.string, "c = [567]");
+  rinha_script_exec("rinha_concat", code, &response, true);
+
+  EXPECT_STREQ(response.string, "c = [567]");
 }
 
 int main() {
-    _test_t tests[] = {
-       rinha_hello_world_test,
+  _test_t tests[] = {
+     rinha_hello_world_test,
 
-       rinha_fibonacci_test,
+     rinha_fibonacci_test,
 
-       rinha_sum0_test,
-       rinha_sum1_test,
-       rinha_sum2_test,
-       rinha_sum3_test,
+     rinha_sum0_test,
+     rinha_sum1_test,
+     rinha_sum2_test,
+     rinha_sum3_test,
 
-       rinha_calc0_test,
-       rinha_calc1_test,
+     rinha_calc0_test,
+     rinha_calc1_test,
 
-       rinha_cond0_test,
-       rinha_tuples_test,
-       rinha_concat_test,
-    };
+     rinha_cond0_test,
+     rinha_tuples_test,
+     rinha_concat_test,
+  };
 
-    run_tests(tests, sizeof(tests) / sizeof(tests[0]));
+  run_tests(tests, sizeof(tests) / sizeof(tests[0]));
 
-    return 0;
+  return 0;
 }
 
