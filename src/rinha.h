@@ -121,7 +121,6 @@ typedef struct _value {
 } rinha_value_t;
 
 
-
 /**
  * @brief Represents a variable with a name and a value.
  *
@@ -129,7 +128,7 @@ typedef struct _value {
  * @var value The value associated with the variable.
  */
 typedef struct {
-    char name[RINHA_CONFIG_SYMBOL_NAME_SIZE];
+//    char name[RINHA_CONFIG_SYMBOL_NAME_SIZE];
     rinha_value_t value;
 } variable_t;
 
@@ -142,7 +141,7 @@ typedef struct {
  * @var pos The position of the token in the line.
  * @var jmp_pc1 Jump target PC1 if applicable.
  * @var jmp_pc2 Jump target PC2 if applicable.
- * @var lexeme The lexeme (text) of the token.
+ * @var lexname The lexname (text) of the token.
  * @var value The value associated with the token if applicable.
  */
 typedef struct {
@@ -152,7 +151,7 @@ typedef struct {
     int pos;
     int jmp_pc1;
     int jmp_pc2;
-    char lexeme[RINHA_CONFIG_STRING_VALUE_MAX];
+    char lexname[RINHA_CONFIG_STRING_VALUE_MAX];
     rinha_value_t value;
 } token_t;
 
@@ -164,7 +163,6 @@ typedef struct {
  */
 typedef struct {
     variable_t mem[RINHA_CONFIG_SYMBOLS_SIZE];
-    //variable_t mem[64];
     int count;
 } stack_t;
 
@@ -176,8 +174,6 @@ typedef struct {
  * @var count The number of arguments.
  */
 typedef struct {
-    //char name[16][16];
-    //int hash[RINHA_CONFIG_SYMBOLS_SIZE];
     int hash[16];
     int count;
 } args_t;
@@ -210,9 +206,10 @@ typedef struct {
     rinha_value_t ret;
     args_t args;
     stack_t *stack;
-    //cache_t cache[RINHA_CONFIG_SYMBOLS_SIZE];
     cache_t cache[RINHA_CONFIG_CACHE_SIZE];
-    int cache_size;
+    //int cache_size;
+    bool cache_enabled;
+    bool cache_checked;
     int pc;
     int hash;
 } function_t;
@@ -397,7 +394,7 @@ _RINHA_CALL_ rinha_value_t rinha_value_set_(rinha_value_t value);
         printf("\n------------------- TOKEN-DEBUG --------------------\n"); \
         printf("function_t: [\033[31m%s\033[0m] Line: [\033[31m%d\033[0m] \n\n", __func__,  __LINE__ ); \
         printf("Symbol:[\033[32m%s\033[0m], Type: [%d], Hash: [%d], Value: [%d]", \
-            rinha_current_token_ctx.lexeme, \
+            rinha_current_token_ctx.lexname, \
             rinha_current_token_ctx.type, \
             rinha_current_token_ctx.hash, \
             rinha_current_token_ctx.value.number); \

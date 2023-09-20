@@ -53,13 +53,6 @@ static bool on_tests = false;
 static char source_name[128];
 
 /**
- * @brief Flag to indicate whether the cache is enabled.
- *
- * This flag is configured in RINHA_CONFIG_CACHE_ENABLE.
- */
-static bool cache_enabled = RINHA_CONFIG_CACHE_ENABLE;
-
-/**
  * @brief Source code pointer.
  *
  * This pointer is used to store the source code of the Rinha program.
@@ -100,13 +93,6 @@ static stack_t *stacks = st2;
  * Pointer used to manage the stack context.
  */
 static stack_t *stack_ctx;
-
-/**
- * @brief Count of function calls.
- *
- * Keeps track of the number of function calls made during execution.
- */
-static int calls_count = 0;
 
 /**
  * @brief Rinha stack pointer.
@@ -459,7 +445,7 @@ _RINHA_CALL_ void rinha_var_set_(stack_t *ctx, rinha_value_t *value, int hash) {
 
   // Set the variable in the stack context
   ctx->mem[hash].value = *value;
-  ctx->count++;
+  ++ctx->count;
 }
 
 /**
@@ -510,8 +496,9 @@ _RINHA_CALL_ function_t *rinha_function_set_(int pc, int hash) {
   function_t *call = &calls[hash];
   call->pc = pc;
   call->hash = hash;
-  call->cache_size = 0;
-  calls_count++;
+  call->cache_enabled = RINHA_CONFIG_CACHE_ENABLE;
+  call->cache_checked = false;
+  //call->cache_size = 0;
   return call;
 }
 
@@ -601,7 +588,7 @@ void rinha_error(const token_t token, const char *fmt, ...) {
           "Pos:" " " TEXT_WHITE("%d") ", stack_t: " TEXT_WHITE(
           "%"
        "d") " )\n\n",
-      token.lexeme, token.type, source_name, token.line, token.pos,
+      token.lexname, token.type, source_name, token.line, token.pos,
       rinha_sp);
 
   const char *code = source_code;
@@ -691,18 +678,18 @@ void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count) {
     }
 
     size_t tokenLength = *code_ptr - token;
-    strncpy(tokens[*rinha_tok_count].lexeme, token, tokenLength);
-    tokens[*rinha_tok_count].lexeme[tokenLength] = '\0';
+    strncpy(tokens[*rinha_tok_count].lexname, token, tokenLength);
+    tokens[*rinha_tok_count].lexname[tokenLength] = '\0';
 
     if (type == TOKEN_STRING) {
       tokens[*rinha_tok_count].type = type;
       tokens[*rinha_tok_count].value =
-          rinha_value_string_set_(tokens[*rinha_tok_count].lexeme);
+          rinha_value_string_set_(tokens[*rinha_tok_count].lexname);
       (*code_ptr)++;
       token_position++;
     } else {
       tokens[*rinha_tok_count].type =
-          rinha_discover_token_typeype_(tokens[*rinha_tok_count].lexeme);
+          rinha_discover_token_typeype_(tokens[*rinha_tok_count].lexname);
     }
 
     tokens[*rinha_tok_count].line = current_line;
@@ -722,7 +709,6 @@ int rinha_check_valid_identifier(const char *token) {
       return 0;
     }
   }
-
   return 1;
 }
 
@@ -748,7 +734,11 @@ void rinha_token_previous() {
  * @return A pointer to the next token.
  */
 token_t *rinha_next_token(void) {
-  return &tokens[rinha_pc];
+  return &tokens[rinha_pc+1];
+}
+
+token_t *rinha_prev_token(void) {
+  return &tokens[rinha_pc-1];
 }
 
 /**
@@ -828,11 +818,44 @@ void rinha_exec_second(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_RPAREN);
 }
 
-inline static void rinha_expression_jump(void) {
+#define rinha_check_call(call) (call && !call->cache_checked && call->cache_enabled )
+
+/**
+ * @brief Checks the availability of cache optimization for the function.
+ *
+ * This function examines the current token context and determines whether
+ * cache optimization can be used for the given function call.
+ *
+ * @param call Pointer to the function call.
+ */
+inline static void rinha_check_cache_availability(function_t *call) {
+  switch (rinha_current_token_ctx.type) {
+    case TOKEN_PRINT:
+      call->cache_enabled = false;
+      break;
+    case TOKEN_IDENTIFIER:
+      // If writing to a global variable disables the cache as well
+      token_t *nt = rinha_next_token();
+      token_t *pt = rinha_prev_token();
+
+      if (pt->type != TOKEN_LET && nt->type == TOKEN_ASSIGN) {
+          call->cache_enabled = false;
+      }
+      break;
+  }
+}
+
+inline static void rinha_expression_jump(function_t *call) {
   while ( rinha_current_token_ctx.type != TOKEN_SEMICOLON
-          && rinha_current_token_ctx.type != TOKEN_EOF) {
+        && rinha_current_token_ctx.type != TOKEN_EOF) {
+
+    if (rinha_check_call(call)) {
+      rinha_check_cache_availability(call);
+    }
     rinha_token_advance();
   }
+  if(call)
+    call->cache_checked = true;
 }
 
 /**
@@ -840,26 +863,37 @@ inline static void rinha_expression_jump(void) {
  *
  * This function skips over a Rinha code block enclosed in curly braces.
  */
-inline static void rinha_block_jump_(void) {
+inline static void rinha_block_jump_(function_t *call) {
   int open_braces = 1;
 
   //Gambiarra sintantica...
   if (rinha_current_token_ctx.type != TOKEN_LBRACE) {
-      rinha_expression_jump();
-      return;
+    rinha_expression_jump(call);
+    return;
   }
 
   rinha_token_consume_(TOKEN_LBRACE);
 
   while (open_braces && rinha_current_token_ctx.type != TOKEN_EOF) {
 
+    if (rinha_check_call(call)) {
+      rinha_check_cache_availability(call);
+    }
+
     rinha_token_advance();
-    if (rinha_current_token_ctx.type == TOKEN_LBRACE) {
-      open_braces++;
-    } else if (rinha_current_token_ctx.type == TOKEN_RBRACE) {
-      open_braces--;
+    switch (rinha_current_token_ctx.type) {
+      case TOKEN_LBRACE:
+        open_braces++;
+        break;
+      case TOKEN_RBRACE:
+        open_braces--;
+        break;
     }
   }
+
+  if(call)
+    call->cache_checked = true;
+
   rinha_token_consume_(TOKEN_RBRACE);
 }
 
@@ -896,7 +930,7 @@ void rinha_exec_closure(int hash) {
   rinha_token_consume_(TOKEN_ARROW);
   call->pc = rinha_pc;
 
-  rinha_block_jump_();
+  rinha_block_jump_(call);
 }
 
 /**
@@ -1264,10 +1298,10 @@ void rinha_exec_calc_(rinha_value_t *left) {
  *
  * @return 'true' if the value is cached and retrieved, 'false' otherwise.
  */
-bool rinha_call_memo_cache_get_(function_t *call, rinha_value_t *ret, int hash) {
+inline bool rinha_call_memo_cache_get_(function_t *call, rinha_value_t *ret, int hash) {
 #if RINHA_CONFIG_CACHE_ENABLE == true
 
-  if(!cache_enabled)
+  if(!call->cache_enabled)
     return false;
 
   cache_t *cache = &call->cache[hash];
@@ -1293,9 +1327,9 @@ bool rinha_call_memo_cache_get_(function_t *call, rinha_value_t *ret, int hash) 
  * @param[in]     ret   A pointer to the value to be cached.
  * @param[in]     hash  The hash value used as the cache key.
  */
-void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *value, int hash) {
+inline void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *value, int hash) {
 #if RINHA_CONFIG_CACHE_ENABLE == true
-  if(!cache_enabled)
+  if(!call->cache_enabled)
     return;
 
   cache_t *cache = &call->cache[hash];
@@ -1303,7 +1337,7 @@ void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *value, int hash
   // Check for collisions; if a value is already cached, do nothing
   if (cache->cached)
   {
-    cache_enabled = false;
+    call->cache_enabled = false;
     return;
   }
 
@@ -1337,16 +1371,12 @@ rinha_value_t rinha_exec_expression_(rinha_value_t *ret) {
  */
 void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
 
-  token_t *nt = rinha_next_token();
-
-  if (nt->type != TOKEN_LPAREN) {
+  if (rinha_current_token_ctx.type != TOKEN_LPAREN) {
       *ret = rinha_value_caller_set_(call);
-      //rinha_token_advance();
       return;
   }
 
   rinha_token_previous();
-
   stack_ctx = &stacks[rinha_sp];
 
   if(rinha_sp+1 >= RINHA_CONFIG_STACK_SIZE) {
@@ -1355,7 +1385,6 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
 
   call->stack = &stacks[++rinha_sp];
   rinha_token_advance();
-
   rinha_token_consume_(TOKEN_LPAREN);
 
   // Parse function arguments
@@ -1365,7 +1394,6 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
     if (rinha_current_token_ctx.type == TOKEN_COMMA) {
       rinha_token_consume_(TOKEN_COMMA);
     }
-
     rinha_function_param_init_(call, ret, i);
   }
 
@@ -1436,14 +1464,14 @@ void rinha_exec_if_statement_(rinha_value_t *ret) {
     }
     if (rinha_current_token_ctx.type == TOKEN_ELSE) {
       rinha_token_consume_(TOKEN_ELSE);
-      rinha_block_jump_();
+      rinha_block_jump_(NULL);
     }
     tokens[tmp_pc].jmp_pc1 = (rinha_pc - 1);
   } else {
     int tmp_pc = rinha_pc;
 
     if (!rinha_current_token_ctx.jmp_pc2) {
-      rinha_block_jump_();
+      rinha_block_jump_(NULL);
       //rinha_token_advance();
       tokens[tmp_pc].jmp_pc2 = (rinha_pc - 1);
     } else {
@@ -1475,7 +1503,7 @@ void rinha_yaswoc(rinha_value_t *value) {
   rinha_token_consume_(TOKEN_YASWOC);
   rinha_token_consume_(TOKEN_LPAREN);
 
-  char *dialog = rinha_current_token_ctx.lexeme;
+  char *dialog = rinha_current_token_ctx.lexname;
   rinha_value_t v;
   v.type = STRING;
   int w = sizeof(woc) / sizeof(woc[0]);
@@ -1517,7 +1545,6 @@ void rinha_clear_stack(void) {
 inline static void rinha_clear_context(void) {
   stacks          = st2;
   stack_ctx       = NULL;
-  calls_count     = 0;
   rinha_sp        = 0;
   rinha_pc        = 0;
   rinha_tok_count = 0;
