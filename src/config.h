@@ -27,13 +27,13 @@
  * @details
  * - RINHA_CONFIG_SYMBOLS_SIZE: Size of the symbols table.
  */
-#define RINHA_CONFIG_SYMBOLS_SIZE 31
+#define RINHA_CONFIG_SYMBOLS_SIZE 64
 
 /**
  * @details
  * - RINHA_CONFIG_STACK_SIZE: Size of the execution stack.
  */
-#define RINHA_CONFIG_STACK_SIZE 65536
+#define RINHA_CONFIG_STACK_SIZE 32000
 
 /**
  * @details
@@ -70,6 +70,6 @@
  *
  * @note Adjust this value as needed based on the memory requirements of your environment.
  */
-#define RINHA_CONFIG_RLIMIT_STACK 512 //Mb
+#define RINHA_CONFIG_RLIMIT_STACK 1024 //Mb
 
 #endif

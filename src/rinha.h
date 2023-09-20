@@ -149,8 +149,8 @@ typedef struct {
     int hash;
     int line;
     int pos;
-    int jmp_pc1;
-    int jmp_pc2;
+    void *jmp_pc1;
+    void *jmp_pc2;
     char lexname[RINHA_CONFIG_STRING_VALUE_MAX];
     rinha_value_t value;
 } token_t;
@@ -187,7 +187,7 @@ typedef struct {
  */
 typedef struct {
     rinha_value_t value;
-    int pc;
+    token_t *pc;
     bool cached;
 } cache_t;
 
@@ -210,7 +210,7 @@ typedef struct {
     //int cache_size;
     bool cache_enabled;
     bool cache_checked;
-    int pc;
+    token_t *pc;
     int hash;
 } function_t;
 
@@ -394,11 +394,11 @@ _RINHA_CALL_ rinha_value_t rinha_value_set_(rinha_value_t value);
         printf("\n------------------- TOKEN-DEBUG --------------------\n"); \
         printf("function_t: [\033[31m%s\033[0m] Line: [\033[31m%d\033[0m] \n\n", __func__,  __LINE__ ); \
         printf("Symbol:[\033[32m%s\033[0m], Type: [%d], Hash: [%d], Value: [%d]", \
-            rinha_current_token_ctx.lexname, \
-            rinha_current_token_ctx.type, \
-            rinha_current_token_ctx.hash, \
-            rinha_current_token_ctx.value.number); \
-        rinha_print_debug_(&rinha_current_token_ctx.value); \
+            rinha_current_token_ctx->lexname, \
+            rinha_current_token_ctx->type, \
+            rinha_current_token_ctx->hash, \
+            rinha_current_token_ctx->value.number); \
+        rinha_print_debug_(&rinha_current_token_ctx->value); \
         printf("\n----------------------------------------------------\n");\
     }
 

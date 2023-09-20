@@ -120,7 +120,7 @@ static int rinha_pc = 0;
  *
  * Stores the current token context during Rinha program parsing and execution.
  */
-static token_t rinha_current_token_ctx;
+static token_t *rinha_current_token_ctx;
 
 /**
  * @brief Token array.
@@ -339,11 +339,7 @@ void rinha_print_statement_(rinha_value_t *value) {
 
   token_t *nt = rinha_next_token();
 
-  if (nt->type == TOKEN_FN) {
-       *value = rinha_value_string_set_("<#closure>");
-  } else {
-      rinha_exec_expression_(value);
-  }
+  rinha_exec_expression_(value);
 
   rinha_print_(value, /* line feed */ true, /* debug mode */ false);
 }
@@ -492,7 +488,7 @@ _RINHA_CALL_ rinha_value_t *rinha_var_get_(stack_t *ctx, int hash) {
  * @param[in] hash  The hash value of the function name.
  * @return A pointer to the function details.
  */
-_RINHA_CALL_ function_t *rinha_function_set_(int pc, int hash) {
+_RINHA_CALL_ function_t *rinha_function_set_(token_t *pc, int hash) {
   function_t *call = &calls[hash];
   call->pc = pc;
   call->hash = hash;
@@ -569,7 +565,7 @@ inline bool rinha_isdelim(char c) {
  * @param[in] fmt    The error message format string (supports variable arguments).
  * @param[in] ...    Variable arguments to be formatted according to fmt.
  */
-void rinha_error(const token_t token, const char *fmt, ...) {
+void rinha_error(const token_t *token, const char *fmt, ...) {
 
   FILE *RINHA_OUTERR = stderr;
 
@@ -588,14 +584,14 @@ void rinha_error(const token_t token, const char *fmt, ...) {
           "Pos:" " " TEXT_WHITE("%d") ", stack_t: " TEXT_WHITE(
           "%"
        "d") " )\n\n",
-      token.lexname, token.type, source_name, token.line, token.pos,
+      token->lexname, token->type, source_name, token->line, token->pos,
       rinha_sp);
 
   const char *code = source_code;
   const char *start = code;
   const char *end = code;
 
-  for (register int i = 1; i < token.line; i++) {
+  for (register int i = 1; i < token->line; i++) {
     while (*end != '\n' && *end != '\0') {
       end++;
     }
@@ -615,7 +611,7 @@ void rinha_error(const token_t token, const char *fmt, ...) {
   fwrite(start, 1, len, RINHA_OUTERR);
   putchar('\n');
 
-  for (int i = 1; i < token.pos; i++) {
+  for (int i = 1; i < token->pos; i++) {
     putchar(' ');
   }
   puts("^"); // Putz...
@@ -716,8 +712,10 @@ int rinha_check_valid_identifier(const char *token) {
  * @brief Advance the current token to the next token in the token stream.
  */
 void rinha_token_advance() {
-  //DEBUG BREAK;
-  rinha_current_token_ctx = tokens[++rinha_pc];
+  //WARNING TO NAVIGATORS, IF YOU NEED TO DEBUG, START HERE
+  //Uncomment the line below.
+  //DEBUG BREAK
+  ++rinha_current_token_ctx; // = tokens[++rinha_pc];
 
 }
 
@@ -725,7 +723,7 @@ void rinha_token_advance() {
  * @brief Move the current token back to the previous token in the token stream.
  */
 void rinha_token_previous() {
-  rinha_current_token_ctx = tokens[--rinha_pc];
+  --rinha_current_token_ctx; // = tokens[--rinha_pc];
 }
 
 /**
@@ -734,11 +732,11 @@ void rinha_token_previous() {
  * @return A pointer to the next token.
  */
 token_t *rinha_next_token(void) {
-  return &tokens[rinha_pc+1];
+  return (rinha_current_token_ctx+1); //&tokens[rinha_pc+1];
 }
 
 token_t *rinha_prev_token(void) {
-  return &tokens[rinha_pc-1];
+  return (rinha_current_token_ctx-1); //&tokens[rinha_pc-1];
 }
 
 /**
@@ -750,7 +748,7 @@ token_t *rinha_prev_token(void) {
  * @param[in] expected_type  The expected token type.
  */
 void rinha_token_consume_(token_type expected_type) {
-  if (rinha_current_token_ctx.type == expected_type) {
+  if (rinha_current_token_ctx->type == expected_type) {
     rinha_token_advance();
   } else {
     rinha_error(rinha_current_token_ctx,
@@ -767,7 +765,7 @@ void rinha_token_consume_(token_type expected_type) {
  * @param[in,out] ret  A pointer to the result value of the program (updated during parsing).
  */
 void rinha_exec_program_(rinha_value_t *ret) {
-  while (rinha_current_token_ctx.type != TOKEN_EOF) {
+  while (rinha_current_token_ctx->type != TOKEN_EOF) {
     rinha_exec_statement_(ret);
   }
 }
@@ -811,7 +809,7 @@ void rinha_exec_second(rinha_value_t *ret) {
   if (ret->type != TUPLE) {
     rinha_token_previous();
     rinha_error(rinha_current_token_ctx,
-                "second: Invalid argument, expected a tuple ");
+       "second: Invalid argument, expected a tuple ");
   }
 
   *ret = *((rinha_value_t *)&ret->tuple.second);
@@ -829,7 +827,7 @@ void rinha_exec_second(rinha_value_t *ret) {
  * @param call Pointer to the function call.
  */
 inline static void rinha_check_cache_availability(function_t *call) {
-  switch (rinha_current_token_ctx.type) {
+  switch (rinha_current_token_ctx->type) {
     case TOKEN_PRINT:
       call->cache_enabled = false;
       break;
@@ -846,8 +844,8 @@ inline static void rinha_check_cache_availability(function_t *call) {
 }
 
 inline static void rinha_expression_jump(function_t *call) {
-  while ( rinha_current_token_ctx.type != TOKEN_SEMICOLON
-        && rinha_current_token_ctx.type != TOKEN_EOF) {
+  while ( rinha_current_token_ctx->type != TOKEN_SEMICOLON
+        && rinha_current_token_ctx->type != TOKEN_EOF) {
 
     if (rinha_check_call(call)) {
       rinha_check_cache_availability(call);
@@ -867,21 +865,21 @@ inline static void rinha_block_jump_(function_t *call) {
   int open_braces = 1;
 
   //Gambiarra sintantica...
-  if (rinha_current_token_ctx.type != TOKEN_LBRACE) {
+  if (rinha_current_token_ctx->type != TOKEN_LBRACE) {
     rinha_expression_jump(call);
     return;
   }
 
   rinha_token_consume_(TOKEN_LBRACE);
 
-  while (open_braces && rinha_current_token_ctx.type != TOKEN_EOF) {
+  while (open_braces && rinha_current_token_ctx->type != TOKEN_EOF) {
 
     if (rinha_check_call(call)) {
       rinha_check_cache_availability(call);
     }
 
     rinha_token_advance();
-    switch (rinha_current_token_ctx.type) {
+    switch (rinha_current_token_ctx->type) {
       case TOKEN_LBRACE:
         open_braces++;
         break;
@@ -905,22 +903,19 @@ inline static void rinha_block_jump_(function_t *call) {
  *
  * @param[in] hash  The hash value for the closure's identifier.
  */
-void rinha_exec_closure(int hash) {
+function_t *rinha_exec_closure(int hash) {
 
-  function_t *call = rinha_function_set_(rinha_pc, hash);
+  function_t *call = rinha_function_set_(rinha_current_token_ctx, hash);
 
   rinha_token_consume_(TOKEN_FN);
   rinha_token_consume_(TOKEN_LPAREN);
-  while (rinha_current_token_ctx.type != TOKEN_RPAREN) {
 
-    if (rinha_current_token_ctx.type == TOKEN_IDENTIFIER) {
+  while (rinha_current_token_ctx->type != TOKEN_RPAREN) {
 
-      rinha_call_parameter_add(call, rinha_current_token_ctx.hash);
-
-      rinha_token_consume_(TOKEN_IDENTIFIER);
-    } else if (rinha_current_token_ctx.type == TOKEN_COMMA) {
-      rinha_token_consume_(TOKEN_COMMA);
+    if (rinha_current_token_ctx->type == TOKEN_IDENTIFIER) {
+      rinha_call_parameter_add(call, rinha_current_token_ctx->hash);
     }
+    rinha_token_advance();
   }
 
   rinha_value_t value = rinha_value_caller_set_(call);
@@ -928,9 +923,10 @@ void rinha_exec_closure(int hash) {
 
   rinha_token_consume_(TOKEN_RPAREN);
   rinha_token_consume_(TOKEN_ARROW);
-  call->pc = rinha_pc;
+  call->pc =  rinha_current_token_ctx; // rinha_pc;
 
   rinha_block_jump_(call);
+  return call;
 }
 
 /**
@@ -943,11 +939,11 @@ void rinha_exec_closure(int hash) {
  */
 void rinha_exec_statement_(rinha_value_t *ret) {
 
-  switch (rinha_current_token_ctx.type) {
+  switch (rinha_current_token_ctx->type) {
   case TOKEN_LET: {
     rinha_token_consume_(TOKEN_LET);
-    int hash = rinha_current_token_ctx.hash;
-    int type = rinha_current_token_ctx.type;
+    int hash = rinha_current_token_ctx->hash;
+    int type = rinha_current_token_ctx->type;
 
     rinha_exec_identifier();
     rinha_token_consume_(TOKEN_ASSIGN);
@@ -956,7 +952,7 @@ void rinha_exec_statement_(rinha_value_t *ret) {
       return; // that's ok, next instruction
     }
 
-    if (rinha_current_token_ctx.type == TOKEN_FN) {
+    if (rinha_current_token_ctx->type == TOKEN_FN) {
       rinha_exec_closure(hash);
       return;
     }
@@ -965,7 +961,7 @@ void rinha_exec_statement_(rinha_value_t *ret) {
     *ret = value;
   } break;
   case TOKEN_FN:
-    rinha_exec_closure(rinha_current_token_ctx.hash);
+    rinha_exec_closure(rinha_current_token_ctx->hash);
     break;
   case TOKEN_FIRST:
     rinha_exec_first(ret);
@@ -998,8 +994,16 @@ void rinha_exec_statement_(rinha_value_t *ret) {
     rinha_exec_if_statement_(ret);
     break;
   case TOKEN_NUMBER:
-    *ret = rinha_current_token_ctx.value;
-    rinha_token_consume_(rinha_current_token_ctx.type);
+    *ret = rinha_current_token_ctx->value;
+    rinha_token_consume_(rinha_current_token_ctx->type);
+    break;
+  case TOKEN_TRUE:
+    *ret = rinha_value_bool_set_(true);
+    rinha_token_advance();
+    break;
+  case TOKEN_FALSE:
+    *ret = rinha_value_bool_set_(false);
+    rinha_token_advance();
     break;
   case TOKEN_EOF:
     break;
@@ -1012,13 +1016,13 @@ void rinha_exec_statement_(rinha_value_t *ret) {
 rinha_value_t rinha_exec_comparison_(rinha_value_t *left) {
   rinha_exec_calc_(left);
 
-  while (rinha_current_token_ctx.type == TOKEN_EQ ||
-         rinha_current_token_ctx.type == TOKEN_GTE ||
-         rinha_current_token_ctx.type == TOKEN_LTE ||
-         rinha_current_token_ctx.type == TOKEN_GT ||
-         rinha_current_token_ctx.type == TOKEN_LT) {
+  while (rinha_current_token_ctx->type == TOKEN_EQ ||
+         rinha_current_token_ctx->type == TOKEN_GTE ||
+         rinha_current_token_ctx->type == TOKEN_LTE ||
+         rinha_current_token_ctx->type == TOKEN_GT ||
+         rinha_current_token_ctx->type == TOKEN_LT) {
 
-    token_type op_type = rinha_current_token_ctx.type;
+    token_type op_type = rinha_current_token_ctx->type;
 
     rinha_token_advance();
     rinha_value_t right = {0};
@@ -1056,7 +1060,7 @@ rinha_value_t rinha_exec_logical_and_(rinha_value_t *left) {
   //bool ret = rinha_exec_comparison_(left);
   rinha_value_t ret = rinha_exec_comparison_(left);
 
-  while (rinha_current_token_ctx.type == TOKEN_AND) {
+  while (rinha_current_token_ctx->type == TOKEN_AND) {
     rinha_token_advance();
     rinha_value_t right = {0};
     rinha_value_t cmp = rinha_exec_comparison_(&right);
@@ -1077,7 +1081,7 @@ rinha_value_t rinha_exec_logical_and_(rinha_value_t *left) {
 rinha_value_t rinha_exec_logical_or_(rinha_value_t *left) {
   rinha_value_t ret = rinha_exec_logical_and_(left);
 
-  while (rinha_current_token_ctx.type == TOKEN_OR) {
+  while (rinha_current_token_ctx->type == TOKEN_OR) {
     rinha_token_advance();
     rinha_value_t right = {0};
     rinha_value_t cmp = rinha_exec_logical_and_(&right);
@@ -1096,10 +1100,10 @@ rinha_value_t rinha_exec_logical_or_(rinha_value_t *left) {
  * @return The result of the assignment expression.
  */
 rinha_value_t rinha_exec_assign(rinha_value_t *left) {
-  int hash = rinha_current_token_ctx.hash;
+  int hash = rinha_current_token_ctx->hash;
   rinha_value_t ret = rinha_exec_logical_or_(left);
 
-  if (rinha_current_token_ctx.type == TOKEN_ASSIGN) {
+  if (rinha_current_token_ctx->type == TOKEN_ASSIGN) {
     rinha_value_t *var = rinha_var_get_(stack_ctx, hash);
     rinha_token_advance();
     ret = rinha_exec_assign(left);
@@ -1120,10 +1124,10 @@ rinha_value_t rinha_exec_assign(rinha_value_t *left) {
  * @param[in,out] ret  A pointer to the result value (updated during parsing).
  */
 void rinha_exec_primary_(rinha_value_t *ret) {
-  switch (rinha_current_token_ctx.type) {
+  switch (rinha_current_token_ctx->type) {
   case TOKEN_IDENTIFIER:
     {
-      rinha_value_t *v = rinha_var_get_(stack_ctx, rinha_current_token_ctx.hash);
+      rinha_value_t *v = rinha_var_get_(stack_ctx, rinha_current_token_ctx->hash);
       if (v && v->type != UNDEFINED) {
         rinha_token_advance();
 
@@ -1138,25 +1142,18 @@ void rinha_exec_primary_(rinha_value_t *ret) {
     }
     break;
   case TOKEN_FN:
-    rinha_exec_closure(rinha_current_token_ctx.hash);
-    /*
-    function_t *c = rinha_function_get_(hash);
-    if (c) {
-      rinha_pc = _pc-1;
-      rinha_token_advance();
-      rinha_function_exec_(c, ret);
-      //return;
-    }
-    */
+    function_t *call = rinha_exec_closure(rinha_current_token_ctx->hash);
+    rinha_current_token_ctx = call->pc;
+    rinha_function_exec_(call, ret);
     rinha_token_advance();
     break;
   case TOKEN_NUMBER:
-    *ret = rinha_current_token_ctx.value;
+    *ret = rinha_current_token_ctx->value;
     (*ret).type = INTEGER;
     rinha_token_advance();
     break;
   case TOKEN_STRING:
-    *ret = rinha_current_token_ctx.value;
+    *ret = rinha_current_token_ctx->value;
     (*ret).type = STRING;
     rinha_token_advance();
     break;
@@ -1164,7 +1161,7 @@ void rinha_exec_primary_(rinha_value_t *ret) {
     rinha_token_advance();
     rinha_exec_expression_(ret);
 
-    if (rinha_current_token_ctx.type == TOKEN_COMMA) {
+    if (rinha_current_token_ctx->type == TOKEN_COMMA) {
       rinha_token_consume_(TOKEN_COMMA);
 
       rinha_value_t second = {0};
@@ -1195,6 +1192,9 @@ void rinha_exec_primary_(rinha_value_t *ret) {
   case TOKEN_IF:
     rinha_exec_if_statement_(ret);
     break;
+  case TOKEN_RBRACE:
+    rinha_token_advance();
+    break;
   default:
     rinha_error(rinha_current_token_ctx, "Token undefined");
   }
@@ -1203,11 +1203,11 @@ void rinha_exec_primary_(rinha_value_t *ret) {
 _RINHA_CALL_ void rinha_exec_term_(rinha_value_t *left) {
   rinha_exec_primary_(left);
 
-  while (rinha_current_token_ctx.type == TOKEN_MULTIPLY ||
-         rinha_current_token_ctx.type == TOKEN_DIVIDE ||
-         rinha_current_token_ctx.type == TOKEN_MOD) {
+  while (rinha_current_token_ctx->type == TOKEN_MULTIPLY ||
+         rinha_current_token_ctx->type == TOKEN_DIVIDE ||
+         rinha_current_token_ctx->type == TOKEN_MOD) {
 
-    token_type op_type = rinha_current_token_ctx.type;
+    token_type op_type = rinha_current_token_ctx->type;
 
     rinha_token_advance();
     rinha_value_t right = {0};
@@ -1262,10 +1262,10 @@ _RINHA_CALL_ static void rinha_value_concat_(rinha_value_t *left, rinha_value_t 
 
 void rinha_exec_calc_(rinha_value_t *left) {
   rinha_exec_term_(left);
-  while (rinha_current_token_ctx.type == TOKEN_PLUS ||
-         rinha_current_token_ctx.type == TOKEN_MINUS) {
+  while (rinha_current_token_ctx->type == TOKEN_PLUS ||
+         rinha_current_token_ctx->type == TOKEN_MINUS) {
 
-    token_type op_type = rinha_current_token_ctx.type;
+    token_type op_type = rinha_current_token_ctx->type;
     rinha_token_advance();
     rinha_value_t right = {0};
     rinha_exec_term_(&right);
@@ -1338,6 +1338,7 @@ inline void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *value, i
   if (cache->cached)
   {
     call->cache_enabled = false;
+    printf("\nCOLISAO\n");
     return;
   }
 
@@ -1371,7 +1372,7 @@ rinha_value_t rinha_exec_expression_(rinha_value_t *ret) {
  */
 void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
 
-  if (rinha_current_token_ctx.type != TOKEN_LPAREN) {
+  if (rinha_current_token_ctx->type != TOKEN_LPAREN) {
       *ret = rinha_value_caller_set_(call);
       return;
   }
@@ -1388,10 +1389,10 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_LPAREN);
 
   // Parse function arguments
-  for (register int i = 0; rinha_current_token_ctx.type != TOKEN_RPAREN; ++i) {
+  for (register int i = 0; rinha_current_token_ctx->type != TOKEN_RPAREN; ++i) {
     rinha_exec_expression_(ret);
 
-    if (rinha_current_token_ctx.type == TOKEN_COMMA) {
+    if (rinha_current_token_ctx->type == TOKEN_COMMA) {
       rinha_token_consume_(TOKEN_COMMA);
     }
     rinha_function_param_init_(call, ret, i);
@@ -1399,13 +1400,13 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
 
   unsigned int hash = rinha_hash_stack_(call);
 
-  int current_pc = rinha_pc;
+  token_t *current_pc = rinha_current_token_ctx;  // rinha_pc;
 
   if ( !rinha_call_memo_cache_get_(call, ret, hash)) {
     // Function not memoized; execute the function's block
     // TODO: Refactor these context flags
     stack_ctx = call->stack;
-    rinha_pc = call->pc - 1;
+    rinha_current_token_ctx = call->pc - 1;
     rinha_token_advance();
     rinha_exec_block_(ret);
     rinha_call_memo_cache_set_(call, ret, hash);
@@ -1414,7 +1415,8 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
   rinha_sp--;
   call->stack->count = 0;
   stack_ctx = call->stack = &stacks[rinha_sp];
-  rinha_pc = current_pc;
+  rinha_current_token_ctx = current_pc;
+
   rinha_token_advance();
 }
 
@@ -1430,14 +1432,14 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
 void rinha_exec_block_(rinha_value_t *ret) {
 
   //Gambiarra sintantica...
-  if (rinha_current_token_ctx.type != TOKEN_LBRACE) {
+  if (rinha_current_token_ctx->type != TOKEN_LBRACE) {
       rinha_exec_statement_(ret);
       return;
   }
 
   rinha_token_consume_(TOKEN_LBRACE);
 
-  while (rinha_current_token_ctx.type != TOKEN_RBRACE) {
+  while (rinha_current_token_ctx->type != TOKEN_RBRACE) {
     rinha_exec_statement_(ret);
   }
 
@@ -1455,31 +1457,30 @@ void rinha_exec_if_statement_(rinha_value_t *ret) {
   if (cond.boolean) {
 
     rinha_exec_block_(ret);
-    int tmp_pc = rinha_pc;
+    token_t *tmp_pc = rinha_current_token_ctx;
 
-    if (rinha_current_token_ctx.jmp_pc1) {
-      rinha_pc = rinha_current_token_ctx.jmp_pc1;
+    if (rinha_current_token_ctx->jmp_pc1) {
+      rinha_current_token_ctx = rinha_current_token_ctx->jmp_pc1;
       rinha_token_advance();
       return;
     }
-    if (rinha_current_token_ctx.type == TOKEN_ELSE) {
+    if (rinha_current_token_ctx->type == TOKEN_ELSE) {
       rinha_token_consume_(TOKEN_ELSE);
       rinha_block_jump_(NULL);
     }
-    tokens[tmp_pc].jmp_pc1 = (rinha_pc - 1);
+    rinha_current_token_ctx->jmp_pc1 = rinha_current_token_ctx;
   } else {
     int tmp_pc = rinha_pc;
 
-    if (!rinha_current_token_ctx.jmp_pc2) {
+    if (!rinha_current_token_ctx->jmp_pc2) {
       rinha_block_jump_(NULL);
-      //rinha_token_advance();
-      tokens[tmp_pc].jmp_pc2 = (rinha_pc - 1);
+      rinha_current_token_ctx->jmp_pc2 = rinha_current_token_ctx;
     } else {
-      rinha_pc = rinha_current_token_ctx.jmp_pc2;
+      rinha_current_token_ctx = rinha_current_token_ctx->jmp_pc2;
       rinha_token_advance();
     }
 
-    if (rinha_current_token_ctx.type == TOKEN_ELSE) {
+    if (rinha_current_token_ctx->type == TOKEN_ELSE) {
       rinha_token_consume_(TOKEN_ELSE);
       rinha_exec_block_(ret);
     }
@@ -1487,8 +1488,8 @@ void rinha_exec_if_statement_(rinha_value_t *ret) {
 }
 
 void rinha_exec_identifier(void) {
-  if (rinha_current_token_ctx.type == TOKEN_IDENTIFIER ||
-      rinha_current_token_ctx.type == TOKEN_WILDCARD) {
+  if (rinha_current_token_ctx->type == TOKEN_IDENTIFIER ||
+      rinha_current_token_ctx->type == TOKEN_WILDCARD) {
     rinha_token_advance();
   } else {
     rinha_error(rinha_current_token_ctx, "Expected an identifier ");
@@ -1503,7 +1504,7 @@ void rinha_yaswoc(rinha_value_t *value) {
   rinha_token_consume_(TOKEN_YASWOC);
   rinha_token_consume_(TOKEN_LPAREN);
 
-  char *dialog = rinha_current_token_ctx.lexname;
+  char *dialog = rinha_current_token_ctx->lexname;
   rinha_value_t v;
   v.type = STRING;
   int w = sizeof(woc) / sizeof(woc[0]);
@@ -1581,7 +1582,7 @@ bool rinha_script_exec(char *name, char *script, rinha_value_t *response, bool t
     tokens[rinha_tok_count++].type = TOKEN_EOF;
 
     // Initialize current token
-    rinha_current_token_ctx = tokens[0];
+    rinha_current_token_ctx = tokens;
     rinha_value_t ret = {0};
 
     rinha_exec_program_(&ret);
