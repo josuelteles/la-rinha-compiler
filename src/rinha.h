@@ -96,6 +96,7 @@ typedef enum {
         int64_t number; \
         bool boolean; \
         char string[RINHA_CONFIG_STRING_VALUE_MAX]; \
+        void *function; \
    }
 
 struct __primitive {
@@ -213,6 +214,7 @@ typedef struct {
     cache_t cache[RINHA_CONFIG_CACHE_SIZE];
     int cache_size;
     int pc;
+    int hash;
 } function_t;
 
 /**

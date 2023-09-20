@@ -180,6 +180,12 @@ void rinha_print_(rinha_value_t *value, bool lf, bool debug) {
         fprintf(stdout, "\nSTRING (%ld): ->", strlen(value->string));
       fprintf(stdout, "%s%c", value->string, end_char);
       break;
+    case FUNCTION:
+      if (debug)
+        fprintf(stdout, "\nFUNCTION: ->Hash(%d)",
+             ( (function_t *) value->function)->hash);
+      fprintf(stdout, "<#closure>%c", end_char);
+      break;
     case INTEGER:
       if (debug)
         fprintf(stdout, "\nINTEGER: ->");
@@ -233,6 +239,14 @@ _RINHA_CALL_ static rinha_value_t rinha_value_string_set_(char *value) {
   rinha_value_t ret = {0};
   ret.type = STRING;
   strncpy(ret.string, value, sizeof(ret.string));
+
+  return ret;
+}
+
+_RINHA_CALL_ static rinha_value_t rinha_value_caller_set_(function_t *func) {
+  rinha_value_t ret = {0};
+  ret.type = FUNCTION;
+  ret.function = func;
 
   return ret;
 }
@@ -459,15 +473,27 @@ _RINHA_CALL_ void rinha_var_set_(stack_t *ctx, rinha_value_t *value, int hash) {
  * @return A pointer to the retrieved variable.
  */
 _RINHA_CALL_ rinha_value_t *rinha_var_get_(stack_t *ctx, int hash) {
+
+  //local
   rinha_value_t *v = &ctx->mem[hash].value;
   v->hash = hash;
 
-  // If the variable is undefined in the current context, look in the global context
-  if (v && v->type == UNDEFINED) {
-    v = &stacks[0].mem[hash].value; // global
+  //local
+  if (v && v->type != UNDEFINED) {
+    return v;
   }
 
-  return v;
+  //closure local
+  //Access the stack of the previous function
+  if( rinha_sp > 1 ) {
+     v = &stacks[rinha_sp-1].mem[hash].value;
+  }
+
+  if (v && v->type != UNDEFINED) {
+    return v;
+  }
+
+  return &stacks[0].mem[hash].value; //global
 }
 
 /**
@@ -483,6 +509,7 @@ _RINHA_CALL_ rinha_value_t *rinha_var_get_(stack_t *ctx, int hash) {
 _RINHA_CALL_ function_t *rinha_function_set_(int pc, int hash) {
   function_t *call = &calls[hash];
   call->pc = pc;
+  call->hash = hash;
   call->cache_size = 0;
   calls_count++;
   return call;
@@ -801,6 +828,41 @@ void rinha_exec_second(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_RPAREN);
 }
 
+inline static void rinha_expression_jump(void) {
+  while ( rinha_current_token_ctx.type != TOKEN_SEMICOLON
+          && rinha_current_token_ctx.type != TOKEN_EOF) {
+    rinha_token_advance();
+  }
+}
+
+/**
+ * @brief Jump over a Rinha code block.
+ *
+ * This function skips over a Rinha code block enclosed in curly braces.
+ */
+inline static void rinha_block_jump_(void) {
+  int open_braces = 1;
+
+  //Gambiarra sintantica...
+  if (rinha_current_token_ctx.type != TOKEN_LBRACE) {
+      rinha_expression_jump();
+      return;
+  }
+
+  rinha_token_consume_(TOKEN_LBRACE);
+
+  while (open_braces && rinha_current_token_ctx.type != TOKEN_EOF) {
+
+    rinha_token_advance();
+    if (rinha_current_token_ctx.type == TOKEN_LBRACE) {
+      open_braces++;
+    } else if (rinha_current_token_ctx.type == TOKEN_RBRACE) {
+      open_braces--;
+    }
+  }
+  rinha_token_consume_(TOKEN_RBRACE);
+}
+
 /**
  * @brief Parse a function closure.
  *
@@ -826,21 +888,15 @@ void rinha_exec_closure(int hash) {
       rinha_token_consume_(TOKEN_COMMA);
     }
   }
+
+  rinha_value_t value = rinha_value_caller_set_(call);
+  rinha_var_set_(stack_ctx, &value, hash);
+
   rinha_token_consume_(TOKEN_RPAREN);
   rinha_token_consume_(TOKEN_ARROW);
   call->pc = rinha_pc;
 
-  //TODO: Refactor this block
-  int open_braces = 1;
-
-  while (open_braces && rinha_current_token_ctx.type != TOKEN_EOF) {
-    rinha_token_advance();
-    if (rinha_current_token_ctx.type == TOKEN_LBRACE)
-      open_braces++;
-    else if (rinha_current_token_ctx.type == TOKEN_RBRACE)
-      open_braces--;
-  }
-  rinha_token_consume_(TOKEN_RBRACE);
+  rinha_block_jump_();
 }
 
 /**
@@ -852,6 +908,7 @@ void rinha_exec_closure(int hash) {
  * @param[in,out] ret  A pointer to the result value (updated during parsing).
  */
 void rinha_exec_statement_(rinha_value_t *ret) {
+
   switch (rinha_current_token_ctx.type) {
   case TOKEN_LET: {
     rinha_token_consume_(TOKEN_LET);
@@ -859,7 +916,6 @@ void rinha_exec_statement_(rinha_value_t *ret) {
     int type = rinha_current_token_ctx.type;
 
     rinha_exec_identifier();
-
     rinha_token_consume_(TOKEN_ASSIGN);
 
     if (type == TOKEN_WILDCARD) {
@@ -870,7 +926,6 @@ void rinha_exec_statement_(rinha_value_t *ret) {
       rinha_exec_closure(hash);
       return;
     }
-
     rinha_value_t value = rinha_exec_expression_(ret);
     rinha_var_set_(stack_ctx, &value, hash);
     *ret = value;
@@ -1037,18 +1092,15 @@ void rinha_exec_primary_(rinha_value_t *ret) {
       rinha_value_t *v = rinha_var_get_(stack_ctx, rinha_current_token_ctx.hash);
       if (v && v->type != UNDEFINED) {
         rinha_token_advance();
+
+        if(v->type == FUNCTION) {
+           rinha_function_exec_((function_t *) v->function , ret);
+           return;
+        }
         *ret = *v;
-
         return;
       }
-      function_t *call = rinha_function_get_(rinha_current_token_ctx.hash);
-      if (call) {
-        rinha_function_exec_(call, ret);
-        return;
-      }
-
       rinha_error(rinha_current_token_ctx, "Undefined symbol");
-      rinha_token_advance();
     }
     break;
   case TOKEN_FN:
@@ -1105,6 +1157,9 @@ void rinha_exec_primary_(rinha_value_t *ret) {
   case TOKEN_PRINT:
     rinha_print_statement_(ret);
     rinha_token_advance();
+    break;
+  case TOKEN_IF:
+    rinha_exec_if_statement_(ret);
     break;
   default:
     rinha_error(rinha_current_token_ctx, "Token undefined");
@@ -1281,6 +1336,17 @@ rinha_value_t rinha_exec_expression_(rinha_value_t *ret) {
  * @param[out] ret   A pointer to store the return value (updated during execution).
  */
 void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
+
+  token_t *nt = rinha_next_token();
+
+  if (nt->type != TOKEN_LPAREN) {
+      *ret = rinha_value_caller_set_(call);
+      //rinha_token_advance();
+      return;
+  }
+
+  rinha_token_previous();
+
   stack_ctx = &stacks[rinha_sp];
 
   if(rinha_sp+1 >= RINHA_CONFIG_STACK_SIZE) {
@@ -1289,6 +1355,7 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
 
   call->stack = &stacks[++rinha_sp];
   rinha_token_advance();
+
   rinha_token_consume_(TOKEN_LPAREN);
 
   // Parse function arguments
@@ -1333,6 +1400,13 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
  * @param[out] ret  A pointer to store the return value (updated during execution).
  */
 void rinha_exec_block_(rinha_value_t *ret) {
+
+  //Gambiarra sintantica...
+  if (rinha_current_token_ctx.type != TOKEN_LBRACE) {
+      rinha_exec_statement_(ret);
+      return;
+  }
+
   rinha_token_consume_(TOKEN_LBRACE);
 
   while (rinha_current_token_ctx.type != TOKEN_RBRACE) {
@@ -1341,26 +1415,6 @@ void rinha_exec_block_(rinha_value_t *ret) {
 
   rinha_token_consume_(TOKEN_RBRACE);
 }
-
-/**
- * @brief Jump over a Rinha code block.
- *
- * This function skips over a Rinha code block enclosed in curly braces.
- */
-inline static void rinha_block_jump_(void) {
-  int open_braces = 1;
-
-  while (open_braces && rinha_current_token_ctx.type != TOKEN_EOF) {
-    rinha_token_advance();
-
-    if (rinha_current_token_ctx.type == TOKEN_LBRACE) {
-      open_braces++;
-    } else if (rinha_current_token_ctx.type == TOKEN_RBRACE) {
-      open_braces--;
-    }
-  }
-}
-
 
 void rinha_exec_if_statement_(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_IF);
@@ -1381,6 +1435,7 @@ void rinha_exec_if_statement_(rinha_value_t *ret) {
       return;
     }
     if (rinha_current_token_ctx.type == TOKEN_ELSE) {
+      rinha_token_consume_(TOKEN_ELSE);
       rinha_block_jump_();
     }
     tokens[tmp_pc].jmp_pc1 = (rinha_pc - 1);
@@ -1389,7 +1444,7 @@ void rinha_exec_if_statement_(rinha_value_t *ret) {
 
     if (!rinha_current_token_ctx.jmp_pc2) {
       rinha_block_jump_();
-      rinha_token_advance();
+      //rinha_token_advance();
       tokens[tmp_pc].jmp_pc2 = (rinha_pc - 1);
     } else {
       rinha_pc = rinha_current_token_ctx.jmp_pc2;

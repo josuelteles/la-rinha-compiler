@@ -173,6 +173,7 @@ TEST(rinha_cond0) {
 
   rinha_script_exec("rinha_cond0", code, &response, true);
 
+  EXPECT_EQ(response.type, STRING);
   EXPECT_STREQ(response.string, "COND1");
 }
 
@@ -190,6 +191,7 @@ TEST(rinha_tuples) {
 
   rinha_script_exec("rinha_tuples", code, &response, true);
 
+  EXPECT_EQ(response.type, INTEGER);
   EXPECT_EQ(response.number, 200);
 }
 
@@ -206,7 +208,28 @@ TEST(rinha_concat) {
 
   rinha_script_exec("rinha_concat", code, &response, true);
 
+  EXPECT_EQ(response.type, STRING);
   EXPECT_STREQ(response.string, "c = [567]");
+}
+
+TEST(rinha_closure0) {
+
+  char *code =
+     " let z = fn () => { \n"
+     "   let x = 2; \n"
+     "   let f = fn (y) => x + y; \n"
+     "   f \n"
+     "}; \n"
+     " let f = z(); "
+     " print(f(1)) ";
+
+  rinha_value_t response = {0};
+  rinha_clear_stack();
+
+  rinha_script_exec("rinha_closure0", code, &response, true);
+
+  EXPECT_EQ(response.type, INTEGER);
+  EXPECT_EQ(response.number, 3);
 }
 
 int main() {
@@ -226,6 +249,8 @@ int main() {
      rinha_cond0_test,
      rinha_tuples_test,
      rinha_concat_test,
+
+     rinha_closure0_test,
   };
 
   run_tests(tests, sizeof(tests) / sizeof(tests[0]));
