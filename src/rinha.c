@@ -492,6 +492,7 @@ _RINHA_CALL_ function_t *rinha_function_set_(token_t *pc, int hash) {
   function_t *call = &calls[hash];
   call->pc = pc;
   call->hash = hash;
+  call->args.count = 0;
   call->cache_enabled = RINHA_CONFIG_CACHE_ENABLE;
   call->cache_checked = false;
   //call->cache_size = 0;
@@ -581,7 +582,7 @@ void rinha_error(const token_t *token, const char *fmt, ...) {
       RINHA_OUTERR,
       " ( Token: " TEXT_GREEN("%s") ", Type: " TEXT_WHITE(
           "%d") ", File: " TEXT_WHITE("%s") ", Line: " TEXT_WHITE("%d") ", "
-          "Pos:" " " TEXT_WHITE("%d") ", stack_t: " TEXT_WHITE(
+          "Pos:" " " TEXT_WHITE("%d") ", Stack: " TEXT_WHITE(
           "%"
        "d") " )\n\n",
       token->lexname, token->type, source_name, token->line, token->pos,
@@ -1138,7 +1139,8 @@ void rinha_exec_primary_(rinha_value_t *ret) {
         *ret = *v;
         return;
       }
-      rinha_error(rinha_current_token_ctx, "Undefined symbol");
+      rinha_error(rinha_current_token_ctx, "Undefined symbol (Hash: %d) ",
+          rinha_current_token_ctx->hash );
     }
     break;
   case TOKEN_FN:
@@ -1338,7 +1340,6 @@ inline void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *value, i
   if (cache->cached)
   {
     call->cache_enabled = false;
-    printf("\nCOLISAO\n");
     return;
   }
 
@@ -1389,30 +1390,32 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_LPAREN);
 
   // Parse function arguments
-  for (register int i = 0; rinha_current_token_ctx->type != TOKEN_RPAREN; ++i) {
+  for (register int i = 0; i < call->args.count; ++i) {
     rinha_exec_expression_(ret);
 
     if (rinha_current_token_ctx->type == TOKEN_COMMA) {
-      rinha_token_consume_(TOKEN_COMMA);
+      rinha_token_advance();
     }
     rinha_function_param_init_(call, ret, i);
   }
 
-  unsigned int hash = rinha_hash_stack_(call);
+  unsigned int hash = 0;
 
-  token_t *current_pc = rinha_current_token_ctx;  // rinha_pc;
+  if (call->cache_enabled)
+    hash = rinha_hash_stack_(call);
 
-  if ( !rinha_call_memo_cache_get_(call, ret, hash)) {
-    // Function not memoized; execute the function's block
+  token_t *current_pc = rinha_current_token_ctx;
+
+  // Function not memoized; execute the function's block
+  if (!rinha_call_memo_cache_get_(call, ret, hash)) {
     // TODO: Refactor these context flags
     stack_ctx = call->stack;
-    rinha_current_token_ctx = call->pc - 1;
-    rinha_token_advance();
+    rinha_current_token_ctx = call->pc;
     rinha_exec_block_(ret);
     rinha_call_memo_cache_set_(call, ret, hash);
   }
 
-  rinha_sp--;
+  --rinha_sp;
   call->stack->count = 0;
   stack_ctx = call->stack = &stacks[rinha_sp];
   rinha_current_token_ctx = current_pc;
