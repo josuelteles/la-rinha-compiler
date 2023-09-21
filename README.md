@@ -48,5 +48,5 @@ docker build -t la-rinha:latest .
 ### Docker run
 
 ```bash
-time docker run -v /path/to/file.rinha:/var/rinha/source.rinha la-rinha:latest
+docker run -v /path/to/file.rinha:/var/rinha/source.rinha la-rinha:latest
 ```
