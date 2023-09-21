@@ -1,0 +1,49 @@
+let is_prime_ = fn (n, div) => {
+    if (n <= 1) {
+        false
+    } else {
+        if (n == 2) {
+            true
+        } else {
+            if (n % div == 0) {
+                false
+            } else {
+                if (div * div > n) {
+                    true
+                } else {
+                    is_prime_(n, div + 1)
+                }
+            }
+        }
+    }
+};
+
+let is_prime = fn (n) => {
+    is_prime_(n, 2)
+};
+
+let cout = fn (str) => {
+    print(str)
+};
+
+let check = fn (n) => {  
+    if (is_prime(n)) {
+        cout(" ["+n+"] is prime")
+    } else {
+        cout(" ["+n+"] is not prime")
+    }
+};
+
+let loop = fn (i, n, callback) => {
+  
+    let _ = callback(i);
+
+    if (i < n) {
+        loop(i+1, n, callback)
+    } else {
+        i
+    }
+};
+
+loop(1,100, check)
+
