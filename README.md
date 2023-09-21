@@ -31,7 +31,7 @@ make test
 ### Run
 
 ```bash
-./la-rinha /path/to/file/source.rinha
+./src/la-rinha /path/to/file/source.rinha
 ```
 
 -------------------------------------------
@@ -48,5 +48,5 @@ docker build -t la-rinha:latest .
 ### Docker run
 
 ```bash
-docker run -it --rm -v /path/to/files:/rinha/files la-rinha:latest la-rinha /path/to/files/source.rinha
+time docker run -v /path/to/file.rinha:/var/rinha/source.rinha la-rinha:latest
 ```

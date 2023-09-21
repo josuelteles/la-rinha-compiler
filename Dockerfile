@@ -10,4 +10,4 @@ RUN make
 
 ENV PATH="/rinha:$PATH"
 
-#CMD ["./la-rinha"]
+ENTRYPOINT ["la-rinha", "/var/rinha/source.rinha"]
