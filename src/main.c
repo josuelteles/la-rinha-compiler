@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/resource.h>
+#include <sys/sysinfo.h>
 #include <sys/stat.h>
 
 #include "rinha.h"
@@ -60,11 +61,34 @@ char *rinha_load_file(const char *file) {
   return buffer;
 }
 
+#define _BYTES 1048576
+
+void rinha_sysinfo(void) {
+
+  struct sysinfo sys_info;
+
+  if (sysinfo(&sys_info) != 0) {
+      perror("sysinfo");
+      return;
+  }
+
+  uint64_t total_ram =
+    sys_info.totalram * sys_info.mem_unit / _BYTES;
+  uint64_t free_ram =
+    sys_info.freeram * sys_info.mem_unit / _BYTES;
+  uint64_t available_ram =
+    (sys_info.freeram + sys_info.bufferram) * sys_info.mem_unit / _BYTES;
+
+  printf("\nTotal RAM: %llu Mb\n", total_ram);
+  printf("Free RAM: %llu Mb\n", free_ram);
+  printf("Available RAM: %llu Mb\n\n", available_ram);
+}
+
 bool rinha_stack_config(void) {
   struct rlimit rl;
 
-  rl.rlim_cur = 1024 * 1024 * RINHA_CONFIG_RLIMIT_STACK;
-  rl.rlim_max = 1024 * 1024 * RINHA_CONFIG_RLIMIT_STACK;
+  rl.rlim_cur = RINHA_CONFIG_RLIMIT_STACK;
+  rl.rlim_max = RINHA_CONFIG_RLIMIT_STACK;
 
   if (setrlimit(RLIMIT_STACK, &rl) == -1) {
       fprintf(stderr, "Error configuring stack size limit (err: %s)",
@@ -93,6 +117,7 @@ void rinha_banner(void) {
 
   fprintf( stdout, "\n%s\n\n", banner);
 
+  rinha_sysinfo();
 }
 
 int usage(const char *prog) {

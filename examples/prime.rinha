@@ -26,6 +26,7 @@ let cout = fn (str) => {
     print(str)
 };
 
+
 let check = fn (n) => {  
     if (is_prime(n)) {
         cout(" ["+n+"] is prime")
@@ -46,4 +47,3 @@ let loop = fn (i, n, callback) => {
 };
 
 loop(1,100, check)
-

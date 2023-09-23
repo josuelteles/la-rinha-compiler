@@ -91,13 +91,14 @@ typedef enum {
  */
 #define RINHA_PRIMITIVES \
     value_type type; \
-    int hash; \
     union { \
-        int64_t number; \
+        RINHA_WORD number; \
         bool boolean; \
-        char string[RINHA_CONFIG_STRING_VALUE_MAX]; \
+        char *string; \
         void *function; \
    }
+
+//char string[RINHA_CONFIG_STRING_VALUE_MAX]; \
 
 struct __primitive {
  RINHA_PRIMITIVES;
@@ -151,7 +152,7 @@ typedef struct {
     int pos;
     void *jmp_pc1;
     void *jmp_pc2;
-    char lexname[RINHA_CONFIG_STRING_VALUE_MAX];
+    char lexname[RINHA_CONFIG_STRING_VALUE_SIZE];
     rinha_value_t value;
 } token_t;
 
@@ -174,7 +175,7 @@ typedef struct {
  * @var count The number of arguments.
  */
 typedef struct {
-    int hash[16];
+    int hash[RINHA_CONFIG_SYMBOLS_SIZE];
     int count;
 } args_t;
 
@@ -187,6 +188,7 @@ typedef struct {
  */
 typedef struct {
     rinha_value_t value;
+    rinha_value_t input;
     token_t *pc;
     bool cached;
 } cache_t;
@@ -202,12 +204,12 @@ typedef struct {
  * @var pc Program counter associated with the function.
  */
 typedef struct {
-    char name[RINHA_CONFIG_SYMBOL_NAME_SIZE];
+    //char name[RINHA_CONFIG_SYMBOL_NAME_SIZE];
     rinha_value_t ret;
     args_t args;
     stack_t *stack;
     cache_t cache[RINHA_CONFIG_CACHE_SIZE];
-    //int cache_size;
+    int cache_size;
     bool cache_enabled;
     bool cache_checked;
     token_t *pc;
@@ -255,7 +257,7 @@ void rinha_exec_statement_(rinha_value_t *result);
  *
  * @param[out] result The rinha_value_t structure to store the parsed expression.
  */
-rinha_value_t rinha_exec_expression_(rinha_value_t *result);
+void rinha_exec_expression_(rinha_value_t *result);
 
 /**
  * @brief Parse a block of code.
@@ -289,7 +291,7 @@ void rinha_exec_identifier(void);
  *
  * @return `true` if the parsing is successful, `false` otherwise.
  */
-rinha_value_t rinha_exec_logical_or_(rinha_value_t *result);
+static void rinha_exec_logical_or_(rinha_value_t *result);
 
 /**
  * @brief Parse a term.
@@ -371,6 +373,9 @@ bool rinha_script_exec(char *name, char *script, rinha_value_t *response,
                              bool test);
 
 void rinha_clear_stack(void);
+
+void rinha_var_copy(rinha_value_t *var1, rinha_value_t *var2);
+void rinha_exec_assign(rinha_value_t *left);
 
 _RINHA_CALL_ rinha_value_t rinha_value_set_(rinha_value_t value);
 

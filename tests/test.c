@@ -160,7 +160,7 @@ TEST(rinha_cond0) {
 
   char *code =
     "let teste = fn (arg1, arg2) => { \n"
-    "    if ( arg1 > arg2 || 6 > 5 || 7 > 8  ) { \n"
+    "    if ( arg1 > arg2 || 6 > 5 || 7 > 8 || 2 > 1  ) { \n"
     "        print(\"COND1\"); \n"
     "    } else {"
     "        print(\"COND2\"); \n"

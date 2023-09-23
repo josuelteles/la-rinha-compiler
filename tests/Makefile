@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -I. -I../src -O3
+CFLAGS = -g -I. -I../src -O3
 
 SRC = ../src/rinha.c test.c
 EXE = la-rinha-tests

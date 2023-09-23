@@ -15,13 +15,21 @@
 #ifndef _RINHA_CONFIG_
 #define _RINHA_CONFIG_
 
+#include <sys/resource.h>
+
 #define RINHA_VERSION "alpha: 0.00001"
+
+#define WORD32 int32_t //Max 2.147.483.647
+#define WORD64 int64_t //Max 9.223.372.036.854.775.807
+
+#define RINHA_WORD WORD32 //To save a little more memory, I moved it to 32bits
 
 /**
  * @details
  * - RINHA_CONFIG_STRING_VALUE_MAX: Maximum length for string values in Rinha.
  */
-#define RINHA_CONFIG_STRING_VALUE_MAX 256
+#define RINHA_CONFIG_STRING_VALUE_SIZE 256
+#define RINHA_CONFIG_STRING_POOL_SIZE 32
 
 /**
  * @details
@@ -33,7 +41,7 @@
  * @details
  * - RINHA_CONFIG_STACK_SIZE: Size of the execution stack.
  */
-#define RINHA_CONFIG_STACK_SIZE 32000
+#define RINHA_CONFIG_STACK_SIZE 500100
 
 /**
  * @details
@@ -51,7 +59,7 @@
  * @details
  * - RINHA_CONFIG_CACHE_SIZE: Size of the cache when enabled.
  */
-#define RINHA_CONFIG_CACHE_SIZE 4096
+#define RINHA_CONFIG_CACHE_SIZE 4099
 
 /**
  * @details
@@ -70,6 +78,7 @@
  *
  * @note Adjust this value as needed based on the memory requirements of your environment.
  */
-#define RINHA_CONFIG_RLIMIT_STACK 1024 //Mb
+#define RINHA_CONFIG_RLIMIT_STACK (1024 * 1024 * 800) // 800Mb
+//#define RINHA_CONFIG_RLIMIT_STACK RLIM_INFINITY
 
 #endif

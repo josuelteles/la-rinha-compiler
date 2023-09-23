@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -I. -O3
+CFLAGS = -I. -O3 -fstack-protector-all
 
 SRC = rinha.c main.c
 EXE = la-rinha
