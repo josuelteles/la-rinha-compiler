@@ -1272,6 +1272,9 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
   case TOKEN_RBRACE:
     rinha_token_advance();
     break;
+  case TOKEN_RPAREN:
+    rinha_token_advance();
+    break;
   default:
     rinha_error(rinha_current_token_ctx, "Token undefined");
   }
