@@ -1479,7 +1479,8 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
   }
 
   rinha_token_previous();
-  stack_ctx = &stacks[rinha_sp];
+  //stack_ctx = &stacks[rinha_sp];
+  stack_t *s_ctx = stack_ctx = &stacks[rinha_sp];
 
   if(rinha_sp+1 >= RINHA_CONFIG_STACK_SIZE) {
     rinha_error(rinha_current_token_ctx, "Stack overflow!");
@@ -1489,8 +1490,15 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
   rinha_token_advance();
   rinha_token_consume_(TOKEN_LPAREN);
 
+  for (register int i = 0; i < call->args.count; ++i) {
+    int hash = call->args.hash[i];
+    rinha_value_t *v = rinha_var_get_(stack_ctx, hash);
+    rinha_var_copy(&call->stack->mem[hash].value , v);
+  }
+
   // Parse function arguments
   for (register int i = 0; i < call->args.count; ++i) {
+
     rinha_exec_expression_(ret);
 
     if (rinha_current_token_ctx->type == TOKEN_COMMA) {
