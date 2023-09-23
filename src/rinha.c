@@ -1028,6 +1028,7 @@ inline static void rinha_exec_comparison_(rinha_value_t *left) {
          rinha_current_token_ctx->type == TOKEN_GTE ||
          rinha_current_token_ctx->type == TOKEN_LTE ||
          rinha_current_token_ctx->type == TOKEN_GT ||
+         rinha_current_token_ctx->type == TOKEN_NEQ ||
          rinha_current_token_ctx->type == TOKEN_LT) {
 
     token_type op_type = rinha_current_token_ctx->type;
