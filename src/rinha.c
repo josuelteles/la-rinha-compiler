@@ -131,7 +131,6 @@ static token_t tokens[RINHA_CONFIG_TOKENS_SIZE] = {0};
 static function_t calls[RINHA_CONFIG_CALLS_SIZE];
 
 
-static rinha_value_t value_cond = {0};
 static char string_pool[RINHA_CONFIG_STRING_POOL_SIZE][RINHA_CONFIG_STRING_VALUE_SIZE];
 
 inline static char *rinha_alloc_string(void) {
@@ -367,15 +366,15 @@ token_type rinha_discover_token_typeype_(char *token) {
   } else if (strcmp(token, "if") == 0) {
     return TOKEN_IF;
   } else if (strcmp(token, "else") == 0) {
-    tokens[rinha_tok_count].value = rinha_value_bool_set_(false);
     return TOKEN_ELSE;
   } else if (strcmp(token, "true") == 0) {
     tokens[rinha_tok_count].value = rinha_value_bool_set_(true);
     return TOKEN_TRUE;
+  } else if (strcmp(token, "false") == 0) {
+    tokens[rinha_tok_count].value = rinha_value_bool_set_(false);
+    return TOKEN_FALSE;
   } else if (strcmp(token, special_call) == 0) {
     return TOKEN_YASWOC;
-  } else if (strcmp(token, "false") == 0) {
-    return TOKEN_FALSE;
   } else if (strcmp(token, "print") == 0) {
     return TOKEN_PRINT;
   } else if (strcmp(token, "first") == 0) {
@@ -435,8 +434,8 @@ token_type rinha_discover_token_typeype_(char *token) {
 _RINHA_CALL_ void rinha_var_set_(stack_t *ctx, rinha_value_t *value, int hash) {
   // FIXME:
   // Determine the variable type if not explicitly defined
-  value->type = (!value->type) ? (isdigit(value->string[0]))
-	  ? INTEGER : STRING : value->type;
+  //value->type = (!value->type) ? (isdigit(value->string[0]))
+  //	  ? INTEGER : STRING : value->type;
 
   // Set the variable in the stack context
   rinha_var_copy( &ctx->mem[hash].value, value);
@@ -914,7 +913,7 @@ inline static void rinha_block_jump_(function_t *call) {
  *
  * @param[in] hash  The hash value for the closure's identifier.
  */
-function_t *rinha_exec_closure(int hash) {
+function_t *rinha_prepare_closure(int hash) {
 
   function_t *call = rinha_function_set_(rinha_current_token_ctx, hash);
 
@@ -965,15 +964,14 @@ inline void rinha_exec_statement_(rinha_value_t *ret) {
     }
 
     if (rinha_current_token_ctx->type == TOKEN_FN) {
-      rinha_exec_closure(hash);
+      rinha_prepare_closure(hash);
       return;
     }
     rinha_exec_expression_(ret);
-    rinha_var_set_(stack_ctx, &value_cond, hash);
-    rinha_var_copy(ret, &value_cond);
+    rinha_var_set_(stack_ctx, ret, hash);
   } break;
   case TOKEN_FN:
-    rinha_exec_closure(rinha_current_token_ctx->hash);
+    rinha_prepare_closure(rinha_current_token_ctx->hash);
     break;
   case TOKEN_FIRST:
     rinha_exec_first(ret);
@@ -1026,10 +1024,44 @@ inline void rinha_exec_statement_(rinha_value_t *ret) {
   }
 }
 
-inline static void rinha_exec_comparison_(rinha_value_t *left) {
-  rinha_exec_calc_(left);
+inline static bool rinha_cmp_eq(rinha_value_t *left, rinha_value_t *right) {
 
-  bool has_cond = false;
+  if (left->type != right->type) {
+    rinha_token_previous();
+    rinha_error(rinha_current_token_ctx, "Comparison of different types");
+  }
+
+  switch(left->type) {
+    case INTEGER:
+      return (left->number == right->number);
+    case STRING:
+      return (strcmp(left->string, right->string) == 0);
+    default:
+       return left->boolean == right->boolean;
+  }
+}
+
+inline static bool rinha_cmp_neq(rinha_value_t *left, rinha_value_t *right) {
+
+  if (left->type != right->type) {
+    rinha_token_previous();
+    rinha_error(rinha_current_token_ctx, "Comparison of different types");
+  }
+
+  switch(left->type) {
+    case INTEGER:
+      return (left->number != right->number);
+    case STRING:
+      return (strcmp(left->string, right->string) != 0);
+    default:
+       return left->boolean != right->boolean;
+  }
+}
+
+inline static void rinha_exec_comparison_(rinha_value_t *ret) {
+
+  rinha_value_t left = {0};
+  rinha_exec_calc_(&left);
 
   while (rinha_current_token_ctx->type == TOKEN_EQ ||
          rinha_current_token_ctx->type == TOKEN_GTE ||
@@ -1047,33 +1079,28 @@ inline static void rinha_exec_comparison_(rinha_value_t *left) {
 
     switch(op_type) {
       case TOKEN_EQ:
-        value_cond.boolean = (left->number == right.number);
+        left.boolean = rinha_cmp_eq(&left, &right);
       break;
       case TOKEN_GTE:
-        value_cond.boolean = (left->number >= right.number);
+        left.boolean = (left.number >= right.number);
         break;
       case TOKEN_LTE:
-        value_cond.boolean = (left->number <= right.number);
+        left.boolean = (left.number <= right.number);
         break;
       case TOKEN_LT:
-        value_cond.boolean = (left->number < right.number);
+        left.boolean = (left.number < right.number);
         break;
       case TOKEN_GT:
-        value_cond.boolean = (left->number > right.number);
+        left.boolean = (left.number > right.number);
         break;
       case TOKEN_NEQ:
-        value_cond.boolean = (left->number != right.number);
+        left.boolean = rinha_cmp_neq(&left, &right);
         break;
     }
 
-    has_cond = true;
-    value_cond.type = BOOLEAN;
+    left.type = BOOLEAN;
   }
-
-  //FIXME:
-  //Sometimes readability is the enemy of performance :)
-  if(!has_cond)
-     rinha_var_copy(&value_cond, left);
+  rinha_var_copy(ret, &left);
 }
 
 /**
@@ -1084,16 +1111,20 @@ inline static void rinha_exec_comparison_(rinha_value_t *left) {
  * @param[in,out] left  A pointer to the left operand (updated during parsing).
  * @return The result of the logical AND expression.
  */
-inline static void rinha_exec_logical_and_(rinha_value_t *left) {
-  rinha_exec_comparison_(left);
-  bool cmp = value_cond.boolean;
+inline static void rinha_exec_logical_and_(rinha_value_t *ret) {
+
+  rinha_value_t left = {0};
+  rinha_exec_comparison_(&left);
 
   while (rinha_current_token_ctx->type == TOKEN_AND) {
     rinha_token_advance();
     rinha_value_t right = {0};
     rinha_exec_comparison_(&right);
-    value_cond.boolean = (cmp && value_cond.boolean);
+    left.boolean = left.boolean && right.boolean;
+
+    left.type = BOOLEAN;
   }
+  rinha_var_copy(ret, &left);
 }
 
 /**
@@ -1104,17 +1135,21 @@ inline static void rinha_exec_logical_and_(rinha_value_t *left) {
  * @param[in,out] left  A pointer to the left operand (updated during parsing).
  * @return The result of the logical OR expression.
  */
-inline static void rinha_exec_logical_or_(rinha_value_t *left) {
-  rinha_exec_logical_and_(left);
-  bool cmp = value_cond.boolean;
+inline static void rinha_exec_logical_or_(rinha_value_t *ret) {
+  rinha_value_t left = {0};
+  rinha_exec_logical_and_(&left);
 
   while (rinha_current_token_ctx->type == TOKEN_OR) {
     rinha_token_advance();
     rinha_value_t right = {0};
     rinha_exec_logical_and_(&right);
-    value_cond.boolean = (value_cond.boolean || cmp);
+    left.boolean = (left.boolean || right.boolean);
+    left.type = BOOLEAN;
+
   }
+   rinha_var_copy(ret, &left);
 }
+
 
 inline void rinha_var_copy(rinha_value_t *var1, rinha_value_t *var2) {
 
@@ -1197,7 +1232,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
     break;
   case TOKEN_FN:
     token_t *token_ctx = rinha_current_token_ctx;
-    function_t *call = rinha_exec_closure(rinha_current_token_ctx->hash);
+    function_t *call = rinha_prepare_closure(rinha_current_token_ctx->hash);
     rinha_current_token_ctx = token_ctx+1; //call->pc;
     rinha_call_function_(call, ret);
     rinha_token_advance();
@@ -1576,7 +1611,7 @@ inline void rinha_exec_if_statement_(rinha_value_t *ret) {
 
   rinha_token_consume_(TOKEN_RPAREN);
 
-  if (value_cond.boolean) {
+  if (ret->boolean) {
 
     rinha_exec_block_(ret);
     token_t *tmp_pc = rinha_current_token_ctx;
@@ -1714,7 +1749,6 @@ bool rinha_script_exec(char *name, char *script, rinha_value_t *response, bool t
     // Initialize current token
     rinha_current_token_ctx = tokens;
     rinha_value_t ret = {0};
-    value_cond.type = BOOLEAN;
 
     rinha_exec_program_(&ret);
     *response = ret;
