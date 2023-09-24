@@ -188,7 +188,8 @@ typedef struct {
  */
 typedef struct {
     rinha_value_t value;
-    rinha_value_t input;
+    rinha_value_t input0;
+    rinha_value_t input1;
     token_t *pc;
     bool cached;
 } cache_t;
@@ -319,7 +320,7 @@ void rinha_exec_calc_(rinha_value_t *result);
  * @param[in] f The function to be executed.
  * @param[out] result The rinha_value_t structure to store the function execution result.
  */
-void rinha_function_exec_(function_t *f, rinha_value_t *result);
+static void rinha_call_function_(function_t *f, rinha_value_t *result);
 
 /**
  * @brief Check if a token is a valid identifier.

@@ -15,6 +15,7 @@
 #ifndef _RINHA_CONFIG_
 #define _RINHA_CONFIG_
 
+#include <stdint.h>
 #include <sys/resource.h>
 
 #define RINHA_VERSION "alpha: 0.00001"
@@ -41,7 +42,7 @@
  * @details
  * - RINHA_CONFIG_STACK_SIZE: Size of the execution stack.
  */
-#define RINHA_CONFIG_STACK_SIZE 500100
+#define RINHA_CONFIG_STACK_SIZE 400100
 
 /**
  * @details
@@ -80,5 +81,7 @@
  */
 #define RINHA_CONFIG_RLIMIT_STACK (1024 * 1024 * 800) // 800Mb
 //#define RINHA_CONFIG_RLIMIT_STACK RLIM_INFINITY
+
+#define RINHA_CONFIG_FUNCTION_ARGS_SIZE 5
 
 #endif

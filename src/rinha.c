@@ -830,10 +830,15 @@ void rinha_exec_second(rinha_value_t *ret) {
  *
  * @param call Pointer to the function call.
  */
-inline static void rinha_check_cache_availability(function_t *call) {
+inline static bool rinha_check_cache_availability(function_t *call) {
+
+  if (call->args.count > 2) {
+    return false;
+  }
+
   switch (rinha_current_token_ctx->type) {
     case TOKEN_PRINT:
-      call->cache_enabled = false;
+      return false;
       break;
     case TOKEN_IDENTIFIER:
       // If writing to a global variable disables the cache as well
@@ -841,10 +846,12 @@ inline static void rinha_check_cache_availability(function_t *call) {
       token_t *pt = rinha_prev_token();
 
       if (pt->type != TOKEN_LET && nt->type == TOKEN_ASSIGN) {
-          call->cache_enabled = false;
+        return false;
       }
       break;
   }
+
+  return true;
 }
 
 inline static void rinha_expression_jump(function_t *call) {
@@ -852,7 +859,7 @@ inline static void rinha_expression_jump(function_t *call) {
         && rinha_current_token_ctx->type != TOKEN_EOF) {
 
     if (rinha_check_call(call)) {
-      rinha_check_cache_availability(call);
+      call->cache_enabled = rinha_check_cache_availability(call);
     }
     rinha_token_advance();
   }
@@ -879,7 +886,7 @@ inline static void rinha_block_jump_(function_t *call) {
   while (open_braces && rinha_current_token_ctx->type != TOKEN_EOF) {
 
     if (rinha_check_call(call)) {
-      rinha_check_cache_availability(call);
+      call->cache_enabled = rinha_check_cache_availability(call);
     }
 
     rinha_token_advance();
@@ -1177,7 +1184,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
         rinha_token_advance();
 
         if(v->type == FUNCTION) {
-           rinha_function_exec_((function_t *) v->function , ret);
+           rinha_call_function_((function_t *) v->function , ret);
            return;
         }
         rinha_var_copy(ret, v);
@@ -1192,7 +1199,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
     token_t *token_ctx = rinha_current_token_ctx;
     function_t *call = rinha_exec_closure(rinha_current_token_ctx->hash);
     rinha_current_token_ctx = token_ctx+1; //call->pc;
-    rinha_function_exec_(call, ret);
+    rinha_call_function_(call, ret);
     rinha_token_advance();
     break;
   case TOKEN_NUMBER:
@@ -1400,9 +1407,11 @@ inline static bool rinha_call_memo_cache_get_(function_t *call, rinha_value_t *r
   if (!cache->cached)
     return false;
 
-  rinha_value_t *arg = rinha_function_get_arg(call, 0);
+  rinha_value_t *arg0 = rinha_function_get_arg(call, 0);
+  rinha_value_t *arg1 = rinha_function_get_arg(call, 1);
 
-  if (cache->input.number != arg->number) {
+  if (cache->input0.number != arg0->number ||
+      cache->input1.number != arg1->number) {
     return false;
   }
 
@@ -1441,8 +1450,10 @@ inline static void rinha_call_memo_cache_set_(function_t *call, rinha_value_t *v
     return;
   }
 
-  rinha_value_t *arg = rinha_function_get_arg(call, 0);
-  rinha_var_copy(&cache->input, arg);
+  rinha_value_t *arg0 = rinha_function_get_arg(call, 0);
+  rinha_value_t *arg1 = rinha_function_get_arg(call, 1);
+  rinha_var_copy(&cache->input0, arg0);
+  rinha_var_copy(&cache->input1, arg1);
   rinha_var_copy(&cache->value, value);
   cache->cached = true;
 #endif
@@ -1462,49 +1473,14 @@ inline void rinha_exec_expression_(rinha_value_t *ret) {
 }
 
 
-/**
- * @brief Execute a Rinha function call.
- *
- * This function executes a Rinha function call, including parsing its arguments, checking memoization
- * cache, and executing the function's code block.
- *
- * @param[in]  call  A pointer to the function call structure.
- * @param[out] ret   A pointer to store the return value (updated during execution).
- */
-void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
+inline static void rinha_exec_function_(function_t *call, rinha_value_t *ret, rinha_value_t *args) {
 
-  if (rinha_current_token_ctx->type != TOKEN_LPAREN) {
-      rinha_value_caller_set_(ret, call);
-      return;
-  }
-
-  rinha_token_previous();
-  //stack_ctx = &stacks[rinha_sp];
-  stack_t *s_ctx = stack_ctx = &stacks[rinha_sp];
-
-  if(rinha_sp+1 >= RINHA_CONFIG_STACK_SIZE) {
-    rinha_error(rinha_current_token_ctx, "Stack overflow!");
-  }
+  stack_ctx = &stacks[rinha_sp];
 
   call->stack = &stacks[++rinha_sp];
-  rinha_token_advance();
-  rinha_token_consume_(TOKEN_LPAREN);
 
   for (register int i = 0; i < call->args.count; ++i) {
-    int hash = call->args.hash[i];
-    rinha_value_t *v = rinha_var_get_(stack_ctx, hash);
-    rinha_var_copy(&call->stack->mem[hash].value , v);
-  }
-
-  // Parse function arguments
-  for (register int i = 0; i < call->args.count; ++i) {
-
-    rinha_exec_expression_(ret);
-
-    if (rinha_current_token_ctx->type == TOKEN_COMMA) {
-      rinha_token_advance();
-    }
-    rinha_function_param_init_(call, ret, i);
+    rinha_function_param_init_(call, (rinha_value_t *) &args[i], i);
   }
 
   unsigned int hash = 0;
@@ -1531,6 +1507,43 @@ void rinha_function_exec_(function_t *call, rinha_value_t *ret) {
   rinha_token_advance();
 }
 
+/**
+ * @brief Execute a Rinha function call.
+ *
+ * This function executes a Rinha function call, including parsing its arguments, checking memoization
+ * cache, and executing the function's code block.
+ *
+ * @param[in]  call  A pointer to the function call structure.
+ * @param[out] ret   A pointer to store the return value (updated during execution).
+ */
+inline static void rinha_call_function_(function_t *call, rinha_value_t *ret)
+{
+  if (rinha_current_token_ctx->type != TOKEN_LPAREN) {
+    rinha_value_caller_set_(ret, call);
+    return;
+  }
+
+  if (rinha_sp+1 >= RINHA_CONFIG_STACK_SIZE) {
+    rinha_error(rinha_current_token_ctx, "Stack overflow!");
+  }
+
+  rinha_token_previous();
+  rinha_token_advance();
+  rinha_token_consume_(TOKEN_LPAREN);
+
+  rinha_value_t args[RINHA_CONFIG_FUNCTION_ARGS_SIZE];
+
+  // Parse function arguments
+  for (register int i = 0; i < call->args.count; ++i) {
+
+    rinha_exec_expression_((rinha_value_t *) &args[i]);
+    if (rinha_current_token_ctx->type == TOKEN_COMMA) {
+      rinha_token_advance();
+    }
+  }
+
+  rinha_exec_function_(call, ret, args);
+}
 
 /**
  * @brief Parse a Rinha block of code.
@@ -1544,16 +1557,14 @@ inline void rinha_exec_block_(rinha_value_t *ret) {
 
   //Gambiarra sintantica...
   if (rinha_current_token_ctx->type != TOKEN_LBRACE) {
-      rinha_exec_statement_(ret);
-      return;
+    rinha_exec_statement_(ret);
+    return;
   }
-
   rinha_token_consume_(TOKEN_LBRACE);
 
   while (rinha_current_token_ctx->type != TOKEN_RBRACE) {
     rinha_exec_statement_(ret);
   }
-
   rinha_token_consume_(TOKEN_RBRACE);
 }
 
