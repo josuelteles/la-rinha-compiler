@@ -987,6 +987,14 @@ inline void rinha_exec_statement_(rinha_value_t *ret) {
   case TOKEN_LPAREN:
     rinha_token_advance();
     rinha_exec_expression_(ret);
+
+    if (rinha_current_token_ctx->type == TOKEN_COMMA) {
+      rinha_token_advance();
+      rinha_value_t second = {0};
+      rinha_exec_expression_(&second);
+      *ret = rinha_value_tuple_set_(ret, &second);
+      rinha_token_advance();
+    }
     break;
   case TOKEN_SEMICOLON:
     rinha_token_advance();
@@ -1005,7 +1013,13 @@ inline void rinha_exec_statement_(rinha_value_t *ret) {
     break;
   case TOKEN_NUMBER:
     rinha_var_copy(ret, &rinha_current_token_ctx->value);
-    rinha_token_consume_(rinha_current_token_ctx->type);
+    rinha_token_advance();
+    break;
+  case TOKEN_STRING:
+    rinha_value_t string = rinha_value_string_set_(
+       rinha_current_token_ctx->lexname);
+    rinha_var_copy(ret, &string);
+    rinha_token_advance();
     break;
   case TOKEN_TRUE:
     *ret = rinha_value_bool_set_(true);
