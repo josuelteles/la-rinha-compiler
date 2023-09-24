@@ -181,7 +181,7 @@ void rinha_print_(rinha_value_t *value, bool lf, bool debug) {
     case BOOLEAN:
       if (debug)
         fprintf(stdout, "\nBOOLEAN: ->");
-      fprintf(stdout, "%s%c", value->boolean ? "true" : "false", end_char);
+      fprintf(stdout, "%s%c", BOOL_NAME(value->boolean), end_char);
       break;
     case TUPLE:
       if (debug)
@@ -465,12 +465,11 @@ _RINHA_CALL_ rinha_value_t *rinha_var_get_(stack_t *ctx, int hash) {
 
   //closure local
   //Access the stack of the previous function
-  if( rinha_sp > 1 ) {
-     v = &stacks[rinha_sp-1].mem[hash].value;
-  }
-
-  if (v && v->type != UNDEFINED) {
-    return v;
+  for(register int i=rinha_sp-1, j=0; i > 0 && j < 5; --i, ++j) {
+    v = &stacks[i].mem[hash].value;
+    if (v->type != UNDEFINED) {
+      return v;
+    }
   }
 
   return &stacks[0].mem[hash].value; //global
@@ -1097,7 +1096,6 @@ inline static void rinha_exec_comparison_(rinha_value_t *ret) {
         left.boolean = rinha_cmp_neq(&left, &right);
         break;
     }
-
     left.type = BOOLEAN;
   }
   rinha_var_copy(ret, &left);
@@ -1121,7 +1119,6 @@ inline static void rinha_exec_logical_and_(rinha_value_t *ret) {
     rinha_value_t right = {0};
     rinha_exec_comparison_(&right);
     left.boolean = left.boolean && right.boolean;
-
     left.type = BOOLEAN;
   }
   rinha_var_copy(ret, &left);
@@ -1222,6 +1219,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
            rinha_call_function_((function_t *) v->function , ret);
            return;
         }
+
         rinha_var_copy(ret, v);
 
         return;
@@ -1238,6 +1236,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
     rinha_token_advance();
     break;
   case TOKEN_NUMBER:
+
     rinha_var_copy(ret, &rinha_current_token_ctx->value);
     rinha_token_advance();
     break;
@@ -1384,6 +1383,7 @@ _RINHA_CALL_ static void rinha_value_concat_(rinha_value_t *left, rinha_value_t 
   // Concatenate two strings or unsupported types
   } else {
     sprintf(tmp, "%s%s", left->string, right->string);
+    left->string = rinha_alloc_string();
   }
 
   strncpy(left->string, tmp, RINHA_CONFIG_STRING_VALUE_SIZE);

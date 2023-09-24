@@ -2,12 +2,10 @@ FROM debian:stable-slim
 
 RUN apt-get update && apt-get -y install gcc make
 
-WORKDIR /rinha
+WORKDIR /var/rinha
 
-COPY ./src /rinha
+COPY ./src /var/rinha
 
 RUN make
 
-ENV PATH="/rinha:$PATH"
-
-ENTRYPOINT ["la-rinha", "/var/rinha/source.rinha"]
+ENTRYPOINT ["./la-rinha", "/var/rinha/source.rinha"]

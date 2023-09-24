@@ -4,9 +4,8 @@ all: build
 
 build:
 	$(MAKE) -C ./src
-	$(MAKE) -C ./tests
-
 test:
+	$(MAKE) -C ./tests
 	./tests/la-rinha-tests
 
 docker:
