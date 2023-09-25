@@ -162,9 +162,10 @@ typedef struct {
  * @var mem An array of variables.
  * @var count The number of variables in the stack.
  */
-typedef struct {
+typedef struct _stack {
     variable_t mem[RINHA_CONFIG_SYMBOLS_SIZE];
     int count;
+    struct _stack *parent;
 } stack_t;
 
 /**
@@ -215,6 +216,8 @@ typedef struct {
     bool cache_checked;
     token_t *pc;
     int hash;
+    stack_t *parent;
+    rinha_value_t env[RINHA_CONFIG_SYMBOLS_SIZE];
 } function_t;
 
 /**

@@ -331,6 +331,19 @@ unsigned int rinha_hash_stack_(function_t *f) {
   return (hash % RINHA_CONFIG_CACHE_SIZE);
 }
 
+unsigned int rinha_create_anonymous_hash(char *token) {
+  static char fn[RINHA_CONFIG_CALLS_SIZE][RINHA_CONFIG_STRING_VALUE_SIZE];
+  static uint8_t ref = 0;
+
+  int key = (ref++ % RINHA_CONFIG_CALLS_SIZE);
+
+  snprintf(fn[key],
+    RINHA_CONFIG_STRING_VALUE_SIZE,
+        "@%s%d", token, ref);
+
+  return rinha_hash_str_(fn[key]);
+}
+
 void rinha_print_statement_(rinha_value_t *value) {
   rinha_token_consume_(TOKEN_PRINT);
   rinha_token_consume_(TOKEN_LPAREN);
@@ -341,9 +354,11 @@ void rinha_print_statement_(rinha_value_t *value) {
 }
 
 token_type rinha_discover_token_typeype_(char *token) {
+
   if (strcmp(token, "let") == 0) {
     return TOKEN_LET;
   } else if (strcmp(token, "fn") == 0) {
+    tokens[rinha_tok_count].hash = rinha_create_anonymous_hash(token);
     return TOKEN_FN;
   } else if (strcmp(token, "(") == 0) {
     return TOKEN_LPAREN;
@@ -458,14 +473,13 @@ _RINHA_CALL_ rinha_value_t *rinha_var_get_(stack_t *ctx, int hash) {
   //local
   rinha_value_t *v = &ctx->mem[hash].value;
 
-  //local
   if (v && v->type != UNDEFINED) {
     return v;
   }
 
   //closure local
   //Access the stack of the previous function
-  for(register int i=rinha_sp-1, j=0; i > 0 && j < 5; --i, ++j) {
+  for (register int i=rinha_sp-1, j=0; i > 0 && j < 5; --i, ++j) {
     v = &stacks[i].mem[hash].value;
     if (v->type != UNDEFINED) {
       return v;
@@ -716,7 +730,7 @@ int rinha_check_valid_identifier(const char *token) {
 void rinha_token_advance() {
   //WARNING TO NAVIGATORS, IF YOU NEED TO DEBUG, START HERE
   //Uncomment the line below.
- // DEBUG BREAK
+  //DEBUG BREAK
   ++rinha_current_token_ctx; // = tokens[++rinha_pc];
 
 }
@@ -925,6 +939,16 @@ function_t *rinha_prepare_closure(int hash) {
       rinha_call_parameter_add(call, rinha_current_token_ctx->hash);
     }
     rinha_token_advance();
+  }
+
+  call->parent = stack_ctx;
+
+  if (rinha_sp > 0) {
+    for (register int i = 0; i < RINHA_CONFIG_SYMBOLS_SIZE; ++i) {
+      if (stack_ctx->mem[i].value.type != UNDEFINED ) {
+         rinha_var_copy(&call->env[i], &stack_ctx->mem[i].value);
+      }
+    }
   }
 
   rinha_value_t value = {0};
@@ -1233,9 +1257,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
            rinha_call_function_((function_t *) v->function , ret);
            return;
         }
-
         rinha_var_copy(ret, v);
-
         return;
       }
       rinha_error(rinha_current_token_ctx, "Undefined symbol (Hash: %d) ",
@@ -1245,9 +1267,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
   case TOKEN_FN:
     token_t *token_ctx = rinha_current_token_ctx;
     function_t *call = rinha_prepare_closure(rinha_current_token_ctx->hash);
-    rinha_current_token_ctx = token_ctx+1; //call->pc;
-    rinha_call_function_(call, ret);
-    rinha_token_advance();
+    rinha_value_caller_set_(ret, call);
     break;
   case TOKEN_NUMBER:
 
@@ -1528,9 +1548,17 @@ inline static void rinha_exec_function_(function_t *call, rinha_value_t *ret, ri
 
   call->stack = &stacks[++rinha_sp];
 
+  for (register int i = 0; i < RINHA_CONFIG_SYMBOLS_SIZE; ++i) {
+    if (stack_ctx->mem[i].value.type != UNDEFINED ) {
+      rinha_var_copy(&call->stack->mem[i].value, &call->env[i]);
+    }
+  }
+
   for (register int i = 0; i < call->args.count; ++i) {
     rinha_function_param_init_(call, (rinha_value_t *) &args[i], i);
   }
+
+  call->stack->parent = call->parent;
 
   unsigned int hash = 0;
 
@@ -1576,8 +1604,6 @@ inline static void rinha_call_function_(function_t *call, rinha_value_t *ret)
     rinha_error(rinha_current_token_ctx, "Stack overflow!");
   }
 
-  rinha_token_previous();
-  rinha_token_advance();
   rinha_token_consume_(TOKEN_LPAREN);
 
   rinha_value_t args[RINHA_CONFIG_FUNCTION_ARGS_SIZE];
