@@ -165,7 +165,6 @@ typedef struct {
 typedef struct _stack {
     variable_t mem[RINHA_CONFIG_SYMBOLS_SIZE];
     int count;
-    struct _stack *parent;
 } stack_t;
 
 /**
@@ -178,6 +177,7 @@ typedef struct _stack {
 typedef struct {
     int hash[RINHA_CONFIG_SYMBOLS_SIZE];
     int count;
+    rinha_value_t values[RINHA_CONFIG_FUNCTION_ARGS_SIZE];
 } args_t;
 
 /**
@@ -191,6 +191,7 @@ typedef struct {
     rinha_value_t value;
     rinha_value_t input0;
     rinha_value_t input1;
+    rinha_value_t input2;
     token_t *pc;
     bool cached;
 } cache_t;

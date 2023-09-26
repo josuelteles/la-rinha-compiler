@@ -36,7 +36,7 @@
  * @details
  * - RINHA_CONFIG_SYMBOLS_SIZE: Size of the symbols table.
  */
-#define RINHA_CONFIG_SYMBOLS_SIZE 64
+#define RINHA_CONFIG_SYMBOLS_SIZE 97
 
 /**
  * @details
@@ -48,7 +48,7 @@
  * @details
  * - RINHA_CONFIG_CALLS_SIZE: Maximum number of function calls.
  */
-#define RINHA_CONFIG_CALLS_SIZE 64
+#define RINHA_CONFIG_CALLS_SIZE 96
 
 /**
  * @details
@@ -79,8 +79,8 @@
  *
  * @note Adjust this value as needed based on the memory requirements of your environment.
  */
-#define RINHA_CONFIG_RLIMIT_STACK (1024 * 1024 * 800) // 800Mb
-//#define RINHA_CONFIG_RLIMIT_STACK RLIM_INFINITY
+//#define RINHA_CONFIG_RLIMIT_STACK (1024 * 1024 * 800) // 800Mb
+#define RINHA_CONFIG_RLIMIT_STACK RLIM_INFINITY
 
 #define RINHA_CONFIG_FUNCTION_ARGS_SIZE 5
 
