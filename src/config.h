@@ -23,7 +23,7 @@
 #define WORD32 int32_t //Max 2.147.483.647
 #define WORD64 int64_t //Max 9.223.372.036.854.775.807
 
-#define RINHA_WORD WORD32 //To save a little more memory, I moved it to 32bits
+#define RINHA_WORD WORD64
 
 /**
  * @details
