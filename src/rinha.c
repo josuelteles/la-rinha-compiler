@@ -131,6 +131,7 @@ static token_t tokens[RINHA_CONFIG_TOKENS_SIZE] = {0};
 static function_t calls[RINHA_CONFIG_CALLS_SIZE];
 
 static bool cache_enabled = RINHA_CONFIG_CACHE_ENABLE;
+static int symref = 0;
 
 static char string_pool[RINHA_CONFIG_STRING_POOL_SIZE][RINHA_CONFIG_STRING_VALUE_SIZE];
 
@@ -333,16 +334,37 @@ unsigned int rinha_hash_stack_(function_t *f) {
 }
 
 unsigned int rinha_create_anonymous_hash(char *token) {
-  static char fn[RINHA_CONFIG_CALLS_SIZE][RINHA_CONFIG_STRING_VALUE_SIZE];
-  static uint8_t ref = 0;
+  return ++symref;
+}
 
-  int key = (ref++ % RINHA_CONFIG_CALLS_SIZE);
+token_t *rinha_find_token(char *lexname) {
+  for(register int i=0; i < rinha_tok_count+1; ++i) {
 
-  snprintf(fn[key],
-    RINHA_CONFIG_STRING_VALUE_SIZE,
-        "@%s%d", token, ref);
+      token_t *t = &tokens[i];
 
-  return rinha_hash_str_(fn[key]);
+      switch(t->type) {
+        case TOKEN_IDENTIFIER:
+        case TOKEN_FN:
+          if (strcmp(lexname, t->lexname) == 0) {
+            return t;
+          }
+      }
+  }
+
+  return NULL;
+}
+
+//I'am just trying to avoid more colisions here
+int rinha_create_sym_ref(char *lexname) {
+
+  token_t *t = rinha_find_token(lexname);
+
+  if (t) {
+    return (!t->hash) ?
+        ++symref : t->hash;
+  }
+
+  return rinha_hash_str_(lexname);
 }
 
 void rinha_print_statement_(rinha_value_t *value) {
@@ -433,8 +455,6 @@ token_type rinha_discover_token_typeype_(char *token) {
     return TOKEN_NUMBER;
   }
 
-  tokens[rinha_tok_count].hash = rinha_hash_str_(token);
-
   return TOKEN_IDENTIFIER;
 }
 
@@ -451,8 +471,8 @@ token_type rinha_discover_token_typeype_(char *token) {
 _RINHA_CALL_ void rinha_var_set_(stack_t *ctx, rinha_value_t *value, int hash) {
   // FIXME:
   // Determine the variable type if not explicitly defined
-  //value->type = (!value->type) ? (isdigit(value->string[0]))
-  //	  ? INTEGER : STRING : value->type;
+  value->type = (!value->type) ? (isdigit(value->string[0]))
+	  ? INTEGER : STRING : value->type;
 
   // Set the variable in the stack context
   rinha_var_copy( &ctx->mem[hash].value, value);
@@ -701,6 +721,11 @@ void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count) {
     tokens[*rinha_tok_count].pos = current_position;
 
     (*rinha_tok_count)++;
+
+    if (tokens[*rinha_tok_count-1].type == TOKEN_IDENTIFIER) {
+      tokens[*rinha_tok_count-1].hash =
+        rinha_create_sym_ref(tokens[*rinha_tok_count-1].lexname);
+    }
   }
 }
 
@@ -1008,7 +1033,6 @@ inline void rinha_exec_statement_(rinha_value_t *ret) {
     if (type == TOKEN_WILDCARD) {
       return; // that's ok, next instruction
     }
-
     if (rinha_current_token_ctx->type == TOKEN_FN) {
       rinha_prepare_closure(ret, hash);
       return;
@@ -1300,7 +1324,6 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
     } else {
       rinha_exec_expression_(ret);
     }
-
     if (rinha_current_token_ctx->type == TOKEN_COMMA) {
       rinha_token_consume_(TOKEN_COMMA);
 
@@ -1308,10 +1331,8 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
       rinha_exec_expression_(&second);
       *ret = rinha_value_tuple_set_(ret, &second);
     }
-
     rinha_token_advance();
     break;
-
   case TOKEN_TRUE:
     rinha_var_copy(ret, &rinha_current_token_ctx->value);
     rinha_token_advance();
@@ -1675,9 +1696,7 @@ inline void rinha_exec_block_(rinha_value_t *ret) {
 inline void rinha_exec_if_statement_(rinha_value_t *ret) {
   rinha_token_consume_(TOKEN_IF);
   rinha_token_consume_(TOKEN_LPAREN);
-
   rinha_exec_logical_or_(ret);
-
   rinha_token_consume_(TOKEN_RPAREN);
 
   if (ret->boolean) {
@@ -1777,6 +1796,7 @@ inline static void rinha_clear_context(void) {
   rinha_pc        = 0;
   rinha_tok_count = 0;
   on_tests        = false;
+  symref          = 0;
 }
 
 /**

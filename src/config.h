@@ -29,26 +29,26 @@
  * @details
  * - RINHA_CONFIG_STRING_VALUE_MAX: Maximum length for string values in Rinha.
  */
-#define RINHA_CONFIG_STRING_VALUE_SIZE 256
+#define RINHA_CONFIG_STRING_VALUE_SIZE 1024
 #define RINHA_CONFIG_STRING_POOL_SIZE 32
 
 /**
  * @details
  * - RINHA_CONFIG_SYMBOLS_SIZE: Size of the symbols table.
  */
-#define RINHA_CONFIG_SYMBOLS_SIZE 97
+#define RINHA_CONFIG_SYMBOLS_SIZE 32
 
 /**
  * @details
  * - RINHA_CONFIG_STACK_SIZE: Size of the execution stack.
  */
-#define RINHA_CONFIG_STACK_SIZE 400100
+#define RINHA_CONFIG_STACK_SIZE 1000100
 
 /**
  * @details
  * - RINHA_CONFIG_CALLS_SIZE: Maximum number of function calls.
  */
-#define RINHA_CONFIG_CALLS_SIZE 96
+#define RINHA_CONFIG_CALLS_SIZE 32
 
 /**
  * @details
@@ -82,6 +82,7 @@
 //#define RINHA_CONFIG_RLIMIT_STACK (1024 * 1024 * 800) // 800Mb
 #define RINHA_CONFIG_RLIMIT_STACK RLIM_INFINITY
 
-#define RINHA_CONFIG_FUNCTION_ARGS_SIZE 5
+///
+#define RINHA_CONFIG_FUNCTION_ARGS_SIZE 6
 
 #endif

@@ -110,7 +110,6 @@ TEST(rinha_sum3) {
       "let b = 5;\n"
       "let c = fn (v1, v2) => { v1-v2 };\n"
       "print(c(8, 9)); \n"
-     // "print (sum(fn (a, b) => { a+b } )); \n"
       "print (sum(58)+c(a,b)); \n";
 
   rinha_value_t response = {0};
