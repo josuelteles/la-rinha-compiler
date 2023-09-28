@@ -367,6 +367,7 @@ int rinha_create_sym_ref(char *lexname) {
   return rinha_hash_str_(lexname);
 }
 
+
 void rinha_print_statement_(rinha_value_t *value) {
   rinha_token_consume_(TOKEN_PRINT);
   rinha_token_consume_(TOKEN_LPAREN);
@@ -1091,6 +1092,26 @@ inline void rinha_exec_statement_(rinha_value_t *ret) {
   }
 }
 
+
+static bool rinha_cmp_eq(rinha_value_t *left, rinha_value_t *right);
+static bool rinha_cmp_neq(rinha_value_t *left, rinha_value_t *right);
+
+inline static bool rinha_cmp_tuple_eq(tuple_t *left, tuple_t *right)
+{
+  return rinha_cmp_eq((rinha_value_t *) &left->first,
+          (rinha_value_t *) &right->first) &&
+    rinha_cmp_eq((rinha_value_t *) &left->second,
+           (rinha_value_t *)&right->second);
+}
+
+inline static bool rinha_cmp_tuple_neq(tuple_t *left, tuple_t *right)
+{
+  return rinha_cmp_neq((rinha_value_t *) &left->first,
+          (rinha_value_t *) &right->first) ||
+    rinha_cmp_neq((rinha_value_t *) &left->second,
+          (rinha_value_t *)&right->second);
+}
+
 inline static bool rinha_cmp_eq(rinha_value_t *left, rinha_value_t *right) {
 
   if (left->type != right->type) {
@@ -1103,6 +1124,8 @@ inline static bool rinha_cmp_eq(rinha_value_t *left, rinha_value_t *right) {
       return (left->number == right->number);
     case STRING:
       return (strcmp(left->string, right->string) == 0);
+    case TUPLE:
+      return rinha_cmp_tuple_eq(&left->tuple, &right->tuple);
     default:
        return left->boolean == right->boolean;
   }
@@ -1120,10 +1143,13 @@ inline static bool rinha_cmp_neq(rinha_value_t *left, rinha_value_t *right) {
       return (left->number != right->number);
     case STRING:
       return (strcmp(left->string, right->string) != 0);
+    case TUPLE:
+      return rinha_cmp_tuple_neq(&left->tuple, &right->tuple);
     default:
        return left->boolean != right->boolean;
   }
 }
+
 
 inline static void rinha_exec_comparison_(rinha_value_t *ret) {
 
