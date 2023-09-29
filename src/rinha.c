@@ -120,7 +120,7 @@ static token_t *rinha_current_token_ctx;
  *
  * An array of tokens used in the Rinha interpreter, with a maximum size of 1000.
  */
-static token_t tokens[RINHA_CONFIG_TOKENS_SIZE] = {0};
+static token_t *tokens = NULL; //[RINHA_CONFIG_TOKENS_SIZE] = {0};
 
 /**
  * @brief Function symbols array.
@@ -135,7 +135,7 @@ static int symref = 0;
 
 static char string_pool[RINHA_CONFIG_STRING_POOL_SIZE][RINHA_CONFIG_STRING_VALUE_SIZE];
 
-inline static char *rinha_alloc_string(void) {
+inline static char *rinha_alloc_static_string(void) {
    static uint32_t index = 0;
    return string_pool[++index % RINHA_CONFIG_STRING_POOL_SIZE];
 }
@@ -227,7 +227,7 @@ _RINHA_CALL_ static rinha_value_t rinha_value_bool_set_(bool value) {
 _RINHA_CALL_ static rinha_value_t rinha_value_string_set_(char *value) {
   rinha_value_t ret = {0};
   ret.type = STRING;
-  ret.string = rinha_alloc_string();
+  ret.string = rinha_alloc_static_string();
   strncpy(ret.string, value, RINHA_CONFIG_STRING_VALUE_SIZE);
 
   return ret;
@@ -649,6 +649,34 @@ void rinha_error(const token_t *token, const char *fmt, ...) {
   exit(EXIT_FAILURE);
 }
 
+bool rinha_test_is_comment(char **code_ptr, int *line_number, int *token_position) {
+
+    if (**code_ptr == '/' && *(*code_ptr +1 ) == '/') {
+        (*code_ptr) += 2;
+        while (**code_ptr != '\0' && **code_ptr != '\n') {
+            (*code_ptr)++;
+        }
+        return true;
+
+     } else if ( **code_ptr == '/' &&  *(*code_ptr + 1) == '*') {
+            (*code_ptr) += 2;
+            while (**code_ptr != '\0') {
+                if (**code_ptr == '*' && *(*code_ptr + 1) == '/') {
+                    (*code_ptr) += 2;
+                    return true;
+                }
+              if (**code_ptr == '\n') {
+                (*line_number)++;
+                (*token_position) = 0;
+              }
+              (*code_ptr)++;
+              (*token_position)++;
+            }
+     }
+    return false;
+}
+
+
 /**
  * @brief Tokenize a Rinha source code into tokens.
  *
@@ -658,9 +686,15 @@ void rinha_error(const token_t *token, const char *fmt, ...) {
  * @param[out]    tokens         An array to store the generated tokens.
  * @param[in,out] rinha_tok_count A pointer to an integer to store the total token count (updated).
  */
-void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count) {
+void rinha_tokenize_(char **code_ptr, int *rinha_tok_count) {
   int line_number = 1;
   int token_position = 0;
+  int token_capacity = RINHA_CONFIG_TOKENS_SIZE;
+
+  tokens = (token_t *)calloc(token_capacity, sizeof(token_t));
+
+  if( !tokens )
+    rinha_error(rinha_current_token_ctx, "Memory allocation failed");
 
   while (**code_ptr != '\0') {
     token_type type = TOKEN_UNDEFINED;
@@ -681,6 +715,10 @@ void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count) {
     char *token = *code_ptr;
     int current_line = line_number;
     int current_position = token_position;
+
+    if (rinha_test_is_comment(code_ptr, &line_number, &token_position )) {
+      continue;
+    }
 
     if (**code_ptr == '\'' || **code_ptr == '"') {
       char quote = **code_ptr;
@@ -703,7 +741,20 @@ void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count) {
       }
     }
 
+    if (rinha_test_is_comment(code_ptr, &line_number, &token_position )) {
+      continue;
+    }
+
     size_t tokenLength = *code_ptr - token;
+
+    if (*rinha_tok_count >= token_capacity) {
+        token_capacity *= 2;
+        tokens = (token_t *)realloc(tokens, token_capacity * sizeof(token_t));
+
+        if( !tokens )
+          rinha_error(rinha_current_token_ctx, "Memory allocation failed");
+    }
+
     strncpy(tokens[*rinha_tok_count].lexname, token, tokenLength);
     tokens[*rinha_tok_count].lexname[tokenLength] = '\0';
 
@@ -728,6 +779,14 @@ void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count) {
         rinha_create_sym_ref(tokens[*rinha_tok_count-1].lexname);
     }
   }
+/*
+  for(int i=0; i < *rinha_tok_count; i++) {
+    //printf("\n TOKEN [%s] \n", tokens[i].lexname );
+    //BREAK
+  }
+
+  printf("\n TOKENS [%d] \n", *rinha_tok_count);
+  */
 }
 
 int rinha_check_valid_identifier(const char *token) {
@@ -863,7 +922,7 @@ void rinha_exec_second(rinha_value_t *ret) {
  */
 inline static bool rinha_check_cache_availability(function_t *call) {
 
-  if (call->args.count > 3) {
+  if (call->args.count > 3 || call->args.count == 0 ) {
     return false;
   }
 
@@ -872,6 +931,14 @@ inline static bool rinha_check_cache_availability(function_t *call) {
       return false;
       break;
     case TOKEN_IDENTIFIER:
+
+      // If writing to a global variable disables the cache as well
+      token_t *nt = rinha_next_token();
+      token_t *pt = rinha_prev_token();
+
+      if (pt->type == TOKEN_LET) {
+        call->vars++;
+      }
 
       if (call->hash != rinha_current_token_ctx->hash) {
         rinha_value_t *v = rinha_var_get_(stack_ctx, rinha_current_token_ctx->hash);
@@ -882,9 +949,6 @@ inline static bool rinha_check_cache_availability(function_t *call) {
           }
         }
       }
-      // If writing to a global variable disables the cache as well
-      token_t *nt = rinha_next_token();
-      token_t *pt = rinha_prev_token();
 
       if (pt->type != TOKEN_LET && nt->type == TOKEN_ASSIGN) {
         return false;
@@ -897,8 +961,22 @@ inline static bool rinha_check_cache_availability(function_t *call) {
 }
 
 inline static void rinha_expression_jump(function_t *call) {
+  int open_paren = 0;
   while ( rinha_current_token_ctx->type != TOKEN_SEMICOLON
         && rinha_current_token_ctx->type != TOKEN_EOF) {
+
+    if (rinha_current_token_ctx->type == TOKEN_LPAREN) {
+      open_paren++;
+    } else if ( rinha_current_token_ctx->type == TOKEN_RPAREN ) {
+     if(!open_paren) {
+         break;
+     }
+      open_paren--;
+    }
+
+    if ( !open_paren && rinha_current_token_ctx->type == TOKEN_COMMA) {
+       break;
+    }
 
     if (rinha_check_call(call)) {
       call->cache_enabled = rinha_check_cache_availability(call);
@@ -965,12 +1043,15 @@ function_t *rinha_prepare_closure(rinha_value_t *ret, int hash) {
   rinha_token_consume_(TOKEN_FN);
   rinha_token_consume_(TOKEN_LPAREN);
 
+  call->vars = 0;
+
   while (rinha_current_token_ctx->type != TOKEN_RPAREN) {
 
     if (rinha_current_token_ctx->type == TOKEN_IDENTIFIER) {
       rinha_call_parameter_add(call, rinha_current_token_ctx->hash);
     }
     rinha_token_advance();
+    call->vars++;
   }
 
   call->parent = stack_ctx;
@@ -980,7 +1061,9 @@ function_t *rinha_prepare_closure(rinha_value_t *ret, int hash) {
   if (rinha_sp > 0) {
     for (register int i = 0; i < RINHA_CONFIG_SYMBOLS_SIZE; ++i) {
       if (stack_ctx->mem[i].value.type != UNDEFINED ) {
+
          rinha_var_copy(&call->env[i], &stack_ctx->mem[i].value);
+         call->vars++;
       }
     }
   }
@@ -1253,7 +1336,7 @@ inline void rinha_var_copy(rinha_value_t *var1, rinha_value_t *var2) {
       var1->boolean = var2->boolean;
       break;
     case STRING:
-      var1->string = rinha_alloc_string();
+      var1->string = rinha_alloc_static_string();
       strcpy(var1->string, var2->string);
       break;
     case FUNCTION:
@@ -1299,6 +1382,7 @@ inline void rinha_exec_assign(rinha_value_t *left) {
  * @param[in,out] ret  A pointer to the result value (updated during parsing).
  */
 inline static void rinha_exec_primary_(rinha_value_t *ret) {
+
   switch (rinha_current_token_ctx->type) {
   case TOKEN_IDENTIFIER:
     {
@@ -1323,6 +1407,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
     rinha_prepare_closure(ret, rinha_current_token_ctx->hash);
     break;
   case TOKEN_NUMBER:
+    rinha_current_token_ctx->value = rinha_value_number_set_(atol(rinha_current_token_ctx->lexname));
     rinha_var_copy(ret, &rinha_current_token_ctx->value);
     rinha_token_advance();
     break;
@@ -1394,8 +1479,7 @@ inline static void rinha_exec_primary_(rinha_value_t *ret) {
     rinha_exec_if_statement_(ret);
     break;
   case TOKEN_RBRACE:
-    rinha_token_advance();
-    break;
+  case TOKEN_SEMICOLON:
   case TOKEN_RPAREN:
     rinha_token_advance();
     break;
@@ -1447,7 +1531,7 @@ _RINHA_CALL_ static void rinha_value_concat_(rinha_value_t *left, rinha_value_t 
   // Concatenate an integer and a string
   if (left->type == INTEGER && right->type == STRING) {
     sprintf(tmp, "%d%s", left->number, right->string);
-    left->string = rinha_alloc_string();
+    left->string = rinha_alloc_static_string();
 
   // Concatenate a string and an integer
   } else if (left->type == STRING && right->type == INTEGER) {
@@ -1463,12 +1547,12 @@ _RINHA_CALL_ static void rinha_value_concat_(rinha_value_t *left, rinha_value_t 
   } else if (left->type == BOOLEAN && right->type == STRING) {
 
     sprintf(tmp, "%d%s", BOOL_NAME(left->boolean), right->string);
-    left->string = rinha_alloc_string();
+    left->string = rinha_alloc_static_string();
 
   // Concatenate two strings or unsupported types
   } else {
     sprintf(tmp, "%s%s", left->string, right->string);
-    left->string = rinha_alloc_string();
+    left->string = rinha_alloc_static_string();
   }
 
   strncpy(left->string, tmp, RINHA_CONFIG_STRING_VALUE_SIZE);
@@ -1625,7 +1709,7 @@ inline static void rinha_exec_function_(function_t *call, rinha_value_t *ret, ri
   call->stack = &stacks[++rinha_sp];
 
   for (register int i = 0; i < RINHA_CONFIG_SYMBOLS_SIZE; ++i) {
-    if (stack_ctx->mem[i].value.type != UNDEFINED ) {
+    if (call->env[i].type != UNDEFINED ) {
       rinha_var_copy(&call->stack->mem[i].value, &call->env[i]);
     }
   }
@@ -1782,7 +1866,7 @@ void rinha_yaswoc(rinha_value_t *value) {
   int l = strlen(dialog);
   int i = 1;
 
-  v.string = rinha_alloc_string();
+  v.string = rinha_alloc_static_string();
 
   v.string[0] = 0x20;
   for (; i < l; ++i)
@@ -1810,7 +1894,8 @@ void rinha_yaswoc(rinha_value_t *value) {
 
 void rinha_clear_stack(void) {
 
-  memset(tokens, 0, sizeof(tokens));
+  tokens = NULL;
+  //memset(tokens, 0, sizeof(tokens));
   memset(calls, 0, sizeof(calls));
   memset(tmp, 0, sizeof(tmp));
   memset(string_pool, 0, sizeof(string_pool));
@@ -1856,7 +1941,7 @@ bool rinha_script_exec(char *name, char *script, rinha_value_t *response, bool t
     char *code_ptr = source_code = script;
 
     while (*code_ptr != '\0') {
-      rinha_tokenize_(&code_ptr, tokens, &rinha_tok_count);
+      rinha_tokenize_(&code_ptr, &rinha_tok_count);
     }
 
     tokens[rinha_tok_count++].type = TOKEN_EOF;

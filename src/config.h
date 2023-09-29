@@ -29,7 +29,7 @@
  * @details
  * - RINHA_CONFIG_STRING_VALUE_MAX: Maximum length for string values in Rinha.
  */
-#define RINHA_CONFIG_STRING_VALUE_SIZE 512
+#define RINHA_CONFIG_STRING_VALUE_SIZE 65000
 #define RINHA_CONFIG_STRING_POOL_SIZE 64
 
 /**
@@ -48,7 +48,7 @@
  * @details
  * - RINHA_CONFIG_CALLS_SIZE: Maximum number of function calls.
  */
-#define RINHA_CONFIG_CALLS_SIZE 128
+#define RINHA_CONFIG_CALLS_SIZE 256
 
 /**
  * @details
@@ -66,7 +66,7 @@
  * @details
  * - RINHA_CONFIG_TOKENS_SIZE: Maximum number of tokens that can be stored in the token array
  */
-#define RINHA_CONFIG_TOKENS_SIZE 10000
+#define RINHA_CONFIG_TOKENS_SIZE 1000
 
 /**
  * @details

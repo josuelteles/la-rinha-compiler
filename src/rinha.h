@@ -217,6 +217,7 @@ typedef struct {
     bool cache_checked;
     token_t *pc;
     int hash;
+    int vars;
     stack_t *parent;
     rinha_value_t env[RINHA_CONFIG_SYMBOLS_SIZE];
 } function_t;
@@ -372,7 +373,7 @@ void rinha_print_debug_(rinha_value_t *value);
 
 void rinha_yaswoc( rinha_value_t *value );
 
-void rinha_tokenize_(char **code_ptr, token_t *tokens, int *rinha_tok_count);
+void rinha_tokenize_(char **code_ptr, int *rinha_tok_count);
 
 bool rinha_script_exec(char *name, char *script, rinha_value_t *response,
                              bool test);
